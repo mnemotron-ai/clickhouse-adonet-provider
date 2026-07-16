@@ -32,6 +32,13 @@ make ci                # lint + build + tests + conformance
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and
 `conformance/README.md` for the conformance test suite.
 
+## Contributing
+
+Issues and pull requests are welcome. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and rules (the
+conformance suite is the correctness gate — see `conformance/README.md`);
+this project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE), [NOTICE](NOTICE) and

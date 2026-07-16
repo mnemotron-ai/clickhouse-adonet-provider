@@ -49,8 +49,15 @@ corpus/*.json ──make golden-schema──▶ GetSchema through the provider �
 | `Makefile` | gate contract: golden/golden-schema/fixture/replay/conformance/ci/hooks |
 | `.github/workflows/ci.yml` | CI gate: live replay vs a ClickHouse service container |
 | `.github/workflows/windows.yml` | Windows compile check (path-filtered) |
+| `.github/workflows/claude-review.yml` | automated PR review comment (`anthropics/claude-code-action`); same-repo PRs auto, fork PRs via maintainer `@claude` mention |
 | `.githooks/pre-push` | local guard: main is PR-only |
 | `global.json` | SDK 9 pin (dotnet format rules are SDK-dependent) |
+| `CODE_OF_CONDUCT.md` | Contributor Covenant v2.1; enforcement via GitHub private reporting |
+| `.github/ISSUE_TEMPLATE/` | bug report / feature request forms, blank-issue + security contact config |
+| `.github/PULL_REQUEST_TEMPLATE.md` | PR checklist mirroring CONTRIBUTING (gate, goldens, policy, title, comments) |
+| `.github/CODEOWNERS` | default owner + explicit review requirement for `conformance/golden/`, `conformance/policy.json`, `.github/` |
+| `.github/dependabot.yml` | weekly `nuget` + `github-actions` dependency update PRs |
+| `docs/maintainer-guide.md` | release process, PR merge rules, branch protection setup, public-readiness security checklist |
 
 ## Conformance
 

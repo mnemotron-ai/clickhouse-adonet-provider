@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # .NET package dependencies (src/, tests/, tools/ all resolve from the
+  # repo-root solution, so directory "/" covers every .csproj).
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "nuget"
+
+  # Actions used by our own workflows (ci.yml, windows.yml, claude-review.yml).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"

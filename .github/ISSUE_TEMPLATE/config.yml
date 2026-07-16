@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/mnemotron-ai/clickhouse-adonet-provider/security/policy
+    about: >-
+      Do not open a public issue for security problems. See SECURITY.md and
+      use GitHub's private vulnerability reporting (Security tab → "Report a
+      vulnerability").

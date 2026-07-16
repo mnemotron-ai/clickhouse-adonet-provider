@@ -1,0 +1,100 @@
+name: Bug report
+description: Something in the provider behaves incorrectly, or doesn't match the ClickHouse server.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. This repository treats
+        the conformance suite (see `conformance/README.md`) as the arbiter
+        of correctness, so concrete repro details make a huge difference.
+
+  - type: input
+    id: provider-version
+    attributes:
+      label: Provider version
+      description: NuGet package version, or commit SHA if built from source.
+      placeholder: "e.g. 0.3.1 or commit 0c321ef"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target-framework
+    attributes:
+      label: Target framework
+      description: Which TFM is your application using?
+      options:
+        - net462
+        - net48
+        - net8
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: clickhouse-version
+    attributes:
+      label: ClickHouse server version
+      description: Output of `SELECT version()` on the server you connected to.
+      placeholder: "e.g. 25.3.14"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: host-application
+    attributes:
+      label: Host application
+      description: What is using the provider?
+      options:
+        - SQL Server Analysis Services (Multidimensional)
+        - SQL Server Analysis Services (Tabular)
+        - SSIS
+        - SSDT
+        - Custom .NET application
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: connection-string
+    attributes:
+      label: Connection string (WITHOUT credentials)
+      description: >
+        Redact the password and any secret before pasting. Include
+        everything else (host, port, protocol, database, relevant options).
+      placeholder: "Host=clickhouse.example.com;Port=8123;Protocol=http;Database=default;Username=default"
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-text
+    attributes:
+      label: Exact error text
+      description: Full exception message and stack trace, verbatim. Do not paraphrase.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro-steps
+    attributes:
+      label: Repro steps
+      description: >
+        Minimal steps to reproduce, ideally including the exact SQL text
+        sent to the server. A minimal `CREATE TABLE` + query is more useful
+        than a description of the application flow.
+      placeholder: |
+        1. Connect with ...
+        2. Execute the query: SELECT ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Anything else that might help (logs, screenshots, related issues).
+    validations:
+      required: false

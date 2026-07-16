@@ -1,0 +1,10 @@
+# Default owner for everything not matched below.
+*                          @DarthVader
+
+# Conformance is the correctness contract of this repo (see
+# docs/architecture.md Invariants) — changes here always need maintainer eyes.
+/conformance/golden/       @DarthVader
+/conformance/policy.json   @DarthVader
+
+# CI/workflow changes gate everything else; keep them under explicit review.
+/.github/                  @DarthVader

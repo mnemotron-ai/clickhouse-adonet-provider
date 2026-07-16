@@ -1,0 +1,159 @@
+# Automated PR review via anthropics/claude-code-action@v1.
+#
+# ---------------------------------------------------------------------------
+# Maintainer setup required before this workflow does anything useful:
+#   1. Add the `ANTHROPIC_API_KEY` repository secret
+#      (Settings -> Secrets and variables -> Actions -> New repository secret).
+#   2. Install the Claude GitHub app on this repository: https://github.com/apps/claude
+# Until both are done, these jobs fail at the auth step. That does not affect
+# `make ci` (.github/workflows/ci.yml), which is the actual merge gate.
+# ---------------------------------------------------------------------------
+#
+# Two triggers, by design:
+#   - `pull_request` (opened, ready_for_review): automatic review, restricted
+#     to PRs whose head repository is THIS repository. A pull request from a
+#     fork never satisfies that condition, so it never runs this job
+#     unattended.
+#   - `issue_comment` (@claude mention) on a PR: lets a maintainer ask for
+#     the same review on a fork PR, after manually inspecting the diff.
+#     claude-code-action only responds to users with write access to the
+#     repository (see docs/security.md, "Access Control"), so this path is
+#     already maintainer-gated by the action itself.
+#
+# Neither job checks out the PR head ref directly when it might be untrusted;
+# the mention job checks out the base branch only and reads the diff via
+# `gh pr diff`, per the action's guidance on `pull_request_target`/fork
+# checkouts (docs/security.md).
+#
+# Sources consulted (2026-07-17):
+#   https://github.com/anthropics/claude-code-action (README)
+#   https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+#   https://github.com/anthropics/claude-code-action/blob/main/docs/security.md
+#   https://github.com/anthropics/claude-code-action/blob/main/docs/setup.md
+#   https://github.com/anthropics/claude-code-action/blob/main/docs/solutions.md#automatic-pr-code-review
+#   https://github.com/anthropics/claude-code-action/blob/main/examples/claude.yml
+
+name: claude-review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # Automatic review — only for PRs opened from a branch of this repository.
+  review-pull-request:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read # required for Claude to read CI results on the PR
+      id-token: write # required: used to fetch the GitHub OIDC token
+    env:
+      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - name: Check maintainer setup
+        if: env.HAS_ANTHROPIC_KEY != 'true'
+        run: echo "::notice::ANTHROPIC_API_KEY secret is not configured - skipping automated review (see the header of this workflow file)."
+
+      - uses: actions/checkout@v6
+        if: env.HAS_ANTHROPIC_KEY == 'true'
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        if: env.HAS_ANTHROPIC_KEY == 'true'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          additional_permissions: |
+            actions: read
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request against this repository's
+            CONTRIBUTING.md rules:
+            - `conformance/golden/**` must be unchanged, unless it was
+              regenerated via `make golden` / `make golden-schema` with the
+              reason stated in the PR description.
+            - `conformance/policy.json` must be unchanged, unless the PR
+              states explicit maintainer sign-off and a written justification.
+            - The PR title starts with `WS-N: `.
+            - The CI gate is green: check with `gh pr checks`.
+            - The changed files match the scope described in the PR
+              title/description — flag unrelated or out-of-scope changes.
+            - Documentation and code comments are in English.
+
+            Note: the PR branch is already checked out in the current
+            working directory.
+
+            Post one concise top-level comment with your findings (or "no
+            issues found"). Use inline comments only for specific
+            line-level problems. Do not make code changes.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
+
+  # Mention-triggered review — lets a maintainer request the same review on
+  # any PR, including one opened from a fork, after inspecting it themselves.
+  review-on-mention:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      actions: read # required for Claude to read CI results on the PR
+      id-token: write # required: used to fetch the GitHub OIDC token
+    env:
+      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - name: Check maintainer setup
+        if: env.HAS_ANTHROPIC_KEY != 'true'
+        run: echo "::notice::ANTHROPIC_API_KEY secret is not configured - skipping automated review (see the header of this workflow file)."
+
+      # Base branch only (no `ref:`) — deliberately does not check out the PR
+      # head, which may be untrusted fork code. Claude reads the diff via
+      # `gh pr diff` instead of local files.
+      - uses: actions/checkout@v6
+        if: env.HAS_ANTHROPIC_KEY == 'true'
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        if: env.HAS_ANTHROPIC_KEY == 'true'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          additional_permissions: |
+            actions: read
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.issue.number }}
+
+            Review this pull request against this repository's
+            CONTRIBUTING.md rules:
+            - `conformance/golden/**` must be unchanged, unless it was
+              regenerated via `make golden` / `make golden-schema` with the
+              reason stated in the PR description.
+            - `conformance/policy.json` must be unchanged, unless the PR
+              states explicit maintainer sign-off and a written justification.
+            - The PR title starts with `WS-N: `.
+            - The CI gate is green: check with `gh pr checks`.
+            - The changed files match the scope described in the PR
+              title/description — flag unrelated or out-of-scope changes.
+            - Documentation and code comments are in English.
+
+            Note: only the base branch is checked out locally. Use
+            `gh pr diff` to read the actual changes.
+
+            Post one concise top-level comment with your findings (or "no
+            issues found"). Use inline comments only for specific
+            line-level problems. Do not make code changes.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
