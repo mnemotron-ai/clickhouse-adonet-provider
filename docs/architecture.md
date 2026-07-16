@@ -32,6 +32,8 @@ corpus/*.json ──make golden-schema──▶ GetSchema through the provider �
 | `src/Mnemotron.Data.ClickHouse/` | the provider (fork of ClickHouse.Client 7.14.0, MIT notices preserved) |
 | `src/Mnemotron.Data.ClickHouse/Utility/SchemaDescriber.cs` | `GetSchema` collections (standard ADO.NET shapes) |
 | `tools/Conformance.Runner/` | golden/golden-schema/replay/compare/fixture CLI (net8) |
+| `tools/Installer/` | Setup.exe/Uninstall.exe (net48): C# port of `deploy/*.ps1` — GAC + machine.config + cartridge install/uninstall, no PowerShell required |
+| `tools/Installer/INSTALL.md` | short quick-start copied into the release zip alongside Setup.exe/Uninstall.exe |
 | `conformance/corpus/` | inputs: `<class>-NNN-<hash8>.sql` (queries) and `.json` (schema cases) |
 | `conformance/golden/` | expected outputs — generated only via `make golden*` |
 | `conformance/policy.json` | comparator tolerance policy (the only place deviations are defined) |
@@ -49,6 +51,7 @@ corpus/*.json ──make golden-schema──▶ GetSchema through the provider �
 | `Makefile` | gate contract: golden/golden-schema/fixture/replay/conformance/ci/hooks |
 | `.github/workflows/ci.yml` | CI gate: live replay vs a ClickHouse service container |
 | `.github/workflows/windows.yml` | Windows compile check (path-filtered) |
+| `.github/workflows/release.yml` | tag-driven (`v*`) release: publishes the provider + Setup.exe, assembles the Windows installer zip, creates the GitHub release |
 | `.github/workflows/claude-review.yml` | automated PR review comment (`anthropics/claude-code-action`); same-repo PRs auto, fork PRs via maintainer `@claude` mention |
 | `.githooks/pre-push` | local guard: main is PR-only |
 | `global.json` | SDK 9 pin (dotnet format rules are SDK-dependent) |

@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Setup.exe / Uninstall.exe: a single elevated console app that ports
+       the logic of deploy/register-provider.ps1 and deploy/install-cartridge.ps1
+       so a release does not require PowerShell on the target machine. Mode
+       (install vs uninstall) is picked at runtime from the executable's own
+       file name or an "uninstall" flag; the release pipeline ships the same
+       binary copied to both Setup.exe and Uninstall.exe.
+
+       No NuGet runtime dependencies: pure .NET Framework, so the published
+       exe needs nothing beyond what ships with Windows + .NET Framework 4.8.
+       Microsoft.NETFramework.ReferenceAssemblies lets it build/publish on
+       any OS (macOS/Linux CI); actually running it requires Windows (GAC,
+       machine.config, System.EnterpriseServices). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>Setup</AssemblyName>
+    <RootNamespace>Mnemotron.Data.ClickHouse.Installer</RootNamespace>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- System.EnterpriseServices.Internal.Publish is the managed wrapper
+         around Fusion's GAC install/remove APIs (same type register-provider.ps1
+         uses via Add-Type -AssemblyName System.EnterpriseServices). Not part
+         of the SDK-style project's default reference set. -->
+    <Reference Include="System.EnterpriseServices" />
+  </ItemGroup>
+
+</Project>

@@ -1,17 +1,46 @@
 # Windows deployment — SSAS server + SSDT machine
 
-Manual/scripted install path for the manual SSAS smoke validation
-(`docs/ssas-smoke-checklist.md`) and, until an MSI installer exists, the only
-install path. Everything here runs from an elevated **Windows PowerShell 5.1**
-prompt (`powershell.exe`, not `pwsh` — GAC installation needs
-`System.EnterpriseServices`, which only exists on the .NET Framework CLR).
+Install path for the manual SSAS smoke validation
+(`docs/ssas-smoke-checklist.md`) on a machine hosting SSAS and/or SSDT.
+Two ways to install, doing exactly the same work:
 
-One-command install on a box that has the publish folder:
+* **`Setup.exe` / `Uninstall.exe`** (`tools/Installer/`) — the primary path.
+  Download `Mnemotron.Data.ClickHouse-<tag>-win-installer.zip` from the
+  project's GitHub Releases page, unzip it, and run `Setup.exe` as
+  Administrator (right-click → "Run as administrator", or from an elevated
+  command prompt). No PowerShell required. `Setup.exe` is a from-scratch C#
+  port of the two scripts below; they remain the authoritative behavioral
+  spec it is tested against.
+* **`deploy/register-provider.ps1` + `deploy/install-cartridge.ps1`** — the
+  scripted/CI alternative, for automation or when you need a flag the exe
+  doesn't expose. Runs from an elevated **Windows PowerShell 5.1** prompt
+  (`powershell.exe`, not `pwsh` — GAC installation needs
+  `System.EnterpriseServices`, which only exists on the .NET Framework CLR).
 
-```powershell
-powershell -ExecutionPolicy Bypass -File deploy\register-provider.ps1 -AssemblyPath C:\path\to\publish-net48\Mnemotron.Data.ClickHouse.dll
-powershell -ExecutionPolicy Bypass -File deploy\install-cartridge.ps1        # MD server / SSDT machine only
+Both binaries are **unsigned** for now: Windows SmartScreen will warn on
+first run of `Setup.exe` ("Windows protected your PC") — click "More info" →
+"Run anyway". Code signing is a tracked work item.
+
+Everything in this document (GAC strategy, machine.config edits, cartridge
+locations, known limitations) applies identically to both paths; where
+commands differ, both are shown.
+
+## 0. Quick install — Setup.exe / Uninstall.exe
+
 ```
+Setup.exe                                    # install: GAC + machine.config + cartridge
+Setup.exe --payload C:\path\to\publish-net48  # override the provider publish folder (default: provider-net48 next to the exe)
+Setup.exe --no-cartridge                     # skip cartridge deployment
+Uninstall.exe                                # uninstall (same binary as Setup.exe, copied under this name)
+Uninstall.exe --remove-dependencies          # also GAC-remove the shared dependency assemblies
+Uninstall.exe --keep-cartridge               # leave deployed cartridge copies in place
+Setup.exe --help                             # full option list
+```
+
+Verify from an elevated **Windows PowerShell 5.1** prompt:
+`[System.Data.Common.DbProviderFactories]::GetFactory('Mnemotron.Data.ClickHouse')`
+should return without error. Then restart the SSAS service (and Visual
+Studio) and work through `docs/ssas-smoke-checklist.md`.
 
 ## 1. Prerequisites
 
@@ -26,6 +55,9 @@ powershell -ExecutionPolicy Bypass -File deploy\install-cartridge.ps1        # M
 * Local admin rights.
 
 ## 2. Install order
+
+Scripted path (`Setup.exe` does the equivalent of both steps in one run;
+see §0):
 
 1. **`deploy/register-provider.ps1`** — on *both* the SSAS server and the
    SSDT machine:
@@ -62,6 +94,10 @@ powershell -ExecutionPolicy Bypass -File deploy\install-cartridge.ps1        # M
    (`docs/ssas-smoke-checklist.md`) and record results there.
 
 ## 3. Uninstall
+
+`Uninstall.exe` (or `Setup.exe --uninstall`) does the equivalent of both
+commands below in one step; `--remove-dependencies` maps to
+`-RemoveDependencies`.
 
 ```powershell
 powershell -File deploy\install-cartridge.ps1 -Uninstall

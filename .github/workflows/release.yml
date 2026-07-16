@@ -1,0 +1,84 @@
+# Tag-driven release: publish the provider (net48) and the Setup/Uninstall
+# installer, assemble a Windows installer zip, and publish a GitHub release.
+# Triggered by pushing a `v*` tag (e.g. v1.2.3, v1.2.3-rc1 -- a hyphen in the
+# tag marks the release as a prerelease).
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # net48 build/publish works on Linux runners via
+      # Microsoft.NETFramework.ReferenceAssemblies (both projects reference
+      # it); actually running the output requires Windows.
+      - name: Publish provider (net48)
+        run: dotnet publish src/Mnemotron.Data.ClickHouse -c Release -f net48 -o publish/provider-net48 /p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Publish installer (net48)
+        run: dotnet publish tools/Installer -c Release -f net48 -o publish/installer /p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Assemble release zip
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          NAME="Mnemotron.Data.ClickHouse-${TAG}-win-installer"
+          STAGE="stage/${NAME}"
+          mkdir -p "$STAGE/provider-net48" "$STAGE/cartridge" "$STAGE/deploy"
+
+          cp publish/installer/Setup.exe "$STAGE/Setup.exe"
+          cp publish/installer/Setup.exe "$STAGE/Uninstall.exe"
+          cp -R publish/provider-net48/. "$STAGE/provider-net48/"
+          cp cartridge/clickhouse.xsl "$STAGE/cartridge/clickhouse.xsl"
+          cp deploy/register-provider.ps1 deploy/install-cartridge.ps1 "$STAGE/deploy/"
+          cp tools/Installer/INSTALL.md "$STAGE/INSTALL.md"
+
+          ( cd stage && zip -r "../${NAME}.zip" "${NAME}" )
+          sha256sum "${NAME}.zip" > SHA256SUMS
+
+      - name: Generate release notes from CHANGELOG
+        run: |
+          set -euo pipefail
+          awk '/^## \[Unreleased\]/{flag=1; next} /^## \[/{flag=0} flag' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "(see CHANGELOG.md)" > release-notes.md
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          PRERELEASE: ${{ steps.ver.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          ARGS=(--title "$TAG" --notes-file release-notes.md)
+          if [ "$PRERELEASE" = "true" ]; then
+            ARGS+=(--prerelease)
+          fi
+          gh release create "$TAG" "${ARGS[@]}" \
+            "Mnemotron.Data.ClickHouse-${TAG}-win-installer.zip" \
+            SHA256SUMS

@@ -21,6 +21,12 @@
     <LangVersion>latest</LangVersion>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\..\Mnemotron.Data.ClickHouse.snk</AssemblyOriginatorKeyFile>
+    <!-- Fixed on purpose: the GAC and machine.config <DbProviderFactories>
+         "type" attribute both bake in this exact assembly-qualified name
+         (Version=1.0.0.0 included), so it must never float. The
+         package/informational version (NuGet, /p:Version at release time)
+         is independent and tracks the release tag. -->
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
