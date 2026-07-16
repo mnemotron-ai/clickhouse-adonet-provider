@@ -1,0 +1,35 @@
+# The merge gate: the real provider against a real ClickHouse backend,
+# full corpus replay, structural compare. See conformance/README.md.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.3.14 # same pin as docker-compose.yml
+        env:
+          TZ: UTC
+          CLICKHOUSE_SKIP_USER_SETUP: "1"
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-interval 5s
+          --health-retries 30
+    env:
+      CH_URL: http://localhost:8123
+      CH_CONNECTION: Host=localhost;Port=8123;Protocol=http;Username=default
+      CLICKHOUSE_CONNECTION: Host=localhost;Port=8123;Protocol=http;Username=default
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x # same SDK as dev (global.json): dotnet format rules are SDK-dependent
+      - name: Comparator self-parity
+        run: make self-parity
+      - name: Gate (lint, build, test, replay, conformance)
+        run: make ci

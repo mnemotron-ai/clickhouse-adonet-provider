@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Конформанс-харнесс ai-fabric: golden (оракул по HTTP) | replay (наш
+       провайдер) | compare (структурный компаратор, политика policy.json).
+       net8-only: гоняется на macOS/linux CI; net48-путь провайдера кроется
+       unit-тестами на Windows (build-plan.md §Risks). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <Nullable>disable</Nullable>
+    <AssemblyName>conformance-runner</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Mnemotron.Data.ClickHouse\Mnemotron.Data.ClickHouse.csproj" />
+  </ItemGroup>
+
+</Project>

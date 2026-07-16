@@ -1,0 +1,1 @@
+SELECT toUInt32(0) AS lo, toUInt32(4294967295) AS hi

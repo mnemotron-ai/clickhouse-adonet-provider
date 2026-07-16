@@ -1,0 +1,54 @@
+﻿using System.Collections.Generic;
+using System.Data;
+using System.Runtime.CompilerServices;
+using Mnemotron.Data.ClickHouse.ADO.Readers;
+using Mnemotron.Data.ClickHouse.Types;
+
+namespace Mnemotron.Data.ClickHouse.Utility;
+
+public static class DataReaderExtensions
+{
+    public static string[] GetColumnNames(this IDataReader reader)
+    {
+        var count = reader.FieldCount;
+        var names = new string[count];
+        for (int i = 0; i < count; i++)
+        {
+            names[i] = reader.GetName(i);
+        }
+
+        return names;
+    }
+
+    internal static ClickHouseType[] GetClickHouseColumnTypes(this ClickHouseDataReader reader)
+    {
+        var count = reader.FieldCount;
+        var names = new ClickHouseType[count];
+        for (int i = 0; i < count; i++)
+        {
+            names[i] = reader.GetClickHouseType(i);
+        }
+
+        return names;
+    }
+
+    internal static IEnumerable<object[]> AsEnumerable(this IDataReader reader)
+    {
+        while (reader.Read())
+        {
+            var values = new object[reader.FieldCount];
+            reader.GetValues(values);
+            yield return values;
+        }
+    }
+
+#if !NET462
+    internal static IEnumerable<object> AsEnumerable(this ITuple tuple)
+    {
+        for (int i = 0; i < tuple.Length; i++)
+        {
+            yield return tuple[i];
+        }
+    }
+#endif
+}

@@ -1,0 +1,10 @@
+Mnemotron ADO.NET Data Provider for ClickHouse
+Copyright 2026 Mnemotron AI
+
+This product includes software developed as ClickHouse.Client
+(https://github.com/DarkWanderer/ClickHouse.Client),
+Copyright (c) 2019-2024 Oleg V. Kozlyuk, licensed under the MIT License.
+See THIRD-PARTY-NOTICES.md for the full license text.
+
+ClickHouse is a trademark of ClickHouse, Inc. https://clickhouse.com
+This project is not affiliated with or endorsed by ClickHouse, Inc.

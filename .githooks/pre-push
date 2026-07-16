@@ -1,0 +1,13 @@
+#!/bin/sh
+# main is PR-only. Local stand-in for server-side branch protection (which may
+# be unavailable on free plans). Install: copy to .githooks/pre-push, chmod +x,
+# then: git config core.hooksPath .githooks
+# Escape hatch: SKIP_MAIN_GUARD=1 git push ...
+[ -n "$SKIP_MAIN_GUARD" ] && exit 0
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "pre-push: main is PR-only; open a PR (or SKIP_MAIN_GUARD=1 to override)" >&2
+    exit 1
+  fi
+done
+exit 0

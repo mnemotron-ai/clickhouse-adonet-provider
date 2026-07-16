@@ -1,0 +1,13 @@
+{
+  "_comment": "Comparator tolerance policy - the ONLY place where deviations from byte parity are defined (see conformance/README.md). Changed only with maintainer sign-off. Nullable(...)/LowCardinality(...) wrappers are stripped before mode lookup.",
+  "floatRelativeEpsilon": 1e-12,
+  "compareModes": [
+    { "typePrefix": "Float32", "mode": "float", "why": "TSV rendering of doubles differs between ClickHouse and the CLR in the last digits" },
+    { "typePrefix": "Float64", "mode": "float", "why": "same as Float32" },
+    { "typePrefix": "DateTime", "mode": "datetime", "why": "normalize trailing zeros in the DateTime64 fractional part" },
+    { "typePrefix": "Date", "mode": "date", "why": "CLR DateTime carries a zero time-of-day for Date/Date32; compare the date part" },
+    { "typePrefix": "Bool", "mode": "bool", "why": "CLR True/False vs ClickHouse true/false" },
+    { "typePrefix": "Decimal", "mode": "decimal", "why": "ClickHouse TSV trims trailing fractional zeros (output_format_decimal_trailing_zeros=0) while CLR decimal keeps full scale; values are equal" }
+  ],
+  "default": "exact"
+}

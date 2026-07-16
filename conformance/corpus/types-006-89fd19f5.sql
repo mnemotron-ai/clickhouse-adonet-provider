@@ -1,0 +1,1 @@
+SELECT toInt16(-32768) AS lo, toInt16(32767) AS hi

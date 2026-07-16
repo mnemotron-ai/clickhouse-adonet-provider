@@ -1,0 +1,1 @@
+SELECT toDecimal32('123.45', 2) AS d32, toDecimal64('1234567890.123456', 6) AS d64

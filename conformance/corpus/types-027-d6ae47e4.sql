@@ -1,0 +1,1 @@
+SELECT CAST(NULL AS Nullable(Int32)) AS v

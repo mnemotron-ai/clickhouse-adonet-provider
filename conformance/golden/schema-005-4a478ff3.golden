@@ -1,0 +1,5 @@
+TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	TABLE_TYPE
+String	String	String	String
+conformance_fixture	conformance_fixture	orders	BASE TABLE
+conformance_fixture	conformance_fixture	orders_view	VIEW
+conformance_fixture	conformance_fixture	types_matrix	BASE TABLE

@@ -1,0 +1,9 @@
+# Cases not yet matching the reference outputs.
+# One case per line: <case-id or corpus file> — <one-line symptom>.
+# Claim a case by appending "[<branch-name>]" to its line.
+# When drained, replace the list with a status line:
+#   EMPTY as of <YYYY-MM-DD> (batch <N>): <what was verified green>.
+# New entries come only from triage: provider gaps land here; bad corpus
+# cases get fixed and re-snapshotted; reference nondeterminism goes to the
+# comparator policy (conformance/policy.json), never here.
+EMPTY as of 2026-07-16 (batch 1): 43/43 of corpus batch 1 (smoke-*, types-*) green — GetDataTypeName returns the verbatim server type string. The manual SSDT/SSAS smoke checklist (docs/ssas-smoke-checklist.md) is still pending.

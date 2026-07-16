@@ -1,0 +1,35 @@
+TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	ORDINAL_POSITION	COLUMN_DEFAULT	IS_NULLABLE	DATA_TYPE	CHARACTER_MAXIMUM_LENGTH	NUMERIC_PRECISION	NUMERIC_SCALE	DATETIME_PRECISION
+String	String	String	String	Int32	String	String	String	Int64	Int32	Int32	Int32
+conformance_fixture	conformance_fixture	orders	order_id	1	\N	NO	UInt64	\N	64	0	\N
+conformance_fixture	conformance_fixture	orders	customer	2	\N	NO	LowCardinality(String)	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	orders	amount	3	\N	NO	Decimal(18, 2)	\N	18	2	\N
+conformance_fixture	conformance_fixture	orders	created_at	4	\N	NO	DateTime64(3)	\N	\N	\N	3
+conformance_fixture	conformance_fixture	orders	note	5	\N	YES	Nullable(String)	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	orders_view	order_id	1	\N	NO	UInt64	\N	64	0	\N
+conformance_fixture	conformance_fixture	orders_view	customer	2	\N	NO	LowCardinality(String)	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	orders_view	amount	3	\N	NO	Decimal(18, 2)	\N	18	2	\N
+conformance_fixture	conformance_fixture	types_matrix	id	1	\N	NO	UInt64	\N	64	0	\N
+conformance_fixture	conformance_fixture	types_matrix	i8	2	\N	NO	Int8	\N	8	0	\N
+conformance_fixture	conformance_fixture	types_matrix	i16	3	\N	NO	Int16	\N	16	0	\N
+conformance_fixture	conformance_fixture	types_matrix	i32	4	\N	NO	Int32	\N	32	0	\N
+conformance_fixture	conformance_fixture	types_matrix	i64	5	\N	NO	Int64	\N	64	0	\N
+conformance_fixture	conformance_fixture	types_matrix	u8	6	\N	NO	UInt8	\N	8	0	\N
+conformance_fixture	conformance_fixture	types_matrix	u16	7	\N	NO	UInt16	\N	16	0	\N
+conformance_fixture	conformance_fixture	types_matrix	u32	8	\N	NO	UInt32	\N	32	0	\N
+conformance_fixture	conformance_fixture	types_matrix	f32	9	\N	NO	Float32	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	types_matrix	f64	10	\N	NO	Float64	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	types_matrix	dec	11	\N	NO	Decimal(18, 4)	\N	18	4	\N
+conformance_fixture	conformance_fixture	types_matrix	dec64	12	\N	NO	Decimal(18, 6)	\N	18	6	\N
+conformance_fixture	conformance_fixture	types_matrix	s	13	\N	NO	String	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	types_matrix	fs	14	\N	NO	FixedString(16)	16	\N	\N	\N
+conformance_fixture	conformance_fixture	types_matrix	lc_s	15	\N	NO	LowCardinality(String)	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	types_matrix	d	16	\N	NO	Date	\N	\N	\N	0
+conformance_fixture	conformance_fixture	types_matrix	d32	17	\N	NO	Date32	\N	\N	\N	0
+conformance_fixture	conformance_fixture	types_matrix	dt	18	\N	NO	DateTime	\N	\N	\N	0
+conformance_fixture	conformance_fixture	types_matrix	dt64	19	\N	NO	DateTime64(3)	\N	\N	\N	3
+conformance_fixture	conformance_fixture	types_matrix	uuid	20	\N	NO	UUID	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	types_matrix	n_i32	21	\N	YES	Nullable(Int32)	\N	32	0	\N
+conformance_fixture	conformance_fixture	types_matrix	n_s	22	\N	YES	Nullable(String)	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	types_matrix	n_dt64	23	\N	YES	Nullable(DateTime64(6))	\N	\N	\N	6
+conformance_fixture	conformance_fixture	types_matrix	e8	24	\N	NO	Enum8(\'alpha\' = 1, \'beta\' = 2)	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	types_matrix	b	25	\N	NO	Bool	\N	8	0	\N

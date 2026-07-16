@@ -1,0 +1,34 @@
+# Windows compile check for the .NET Framework targets (net462/net48).
+# Runs only when code or project files change — docs-only PRs skip it
+# (private-repo CI minutes; Windows runners bill at 2x).
+name: windows
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'tools/**'
+      - '**/*.csproj'
+      - '*.sln'
+      - 'global.json'
+      - '.github/workflows/windows.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'tools/**'
+      - '**/*.csproj'
+      - '*.sln'
+      - 'global.json'
+      - '.github/workflows/windows.yml'
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Build all TFMs on Windows
+        run: dotnet build ClickHouseAdoNetProvider.sln -c Release

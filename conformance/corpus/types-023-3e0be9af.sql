@@ -1,0 +1,1 @@
+SELECT toDateTime('2024-06-15 12:34:56') AS dt

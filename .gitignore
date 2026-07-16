@@ -1,0 +1,29 @@
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Build output
+bin/
+obj/
+*.user
+*.suo
+*.swp
+.vs/
+.idea/
+
+# Test / conformance transient output
+conformance/actual/
+misslog*.txt
+TestResults/
+
+# Local worktrees
+.worktrees/
+
+# Local working notes (untracked, not part of the published project)
+/PRD.md
+/research/
+/research-prompt.md
+/research-report.md
+/build-plan.md
+/docs/ws-*.md

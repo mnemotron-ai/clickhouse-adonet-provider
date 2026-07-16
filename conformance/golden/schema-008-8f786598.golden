@@ -1,0 +1,7 @@
+TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	ORDINAL_POSITION	COLUMN_DEFAULT	IS_NULLABLE	DATA_TYPE	CHARACTER_MAXIMUM_LENGTH	NUMERIC_PRECISION	NUMERIC_SCALE	DATETIME_PRECISION
+String	String	String	String	Int32	String	String	String	Int64	Int32	Int32	Int32
+conformance_fixture	conformance_fixture	orders	order_id	1	\N	NO	UInt64	\N	64	0	\N
+conformance_fixture	conformance_fixture	orders	customer	2	\N	NO	LowCardinality(String)	\N	\N	\N	\N
+conformance_fixture	conformance_fixture	orders	amount	3	\N	NO	Decimal(18, 2)	\N	18	2	\N
+conformance_fixture	conformance_fixture	orders	created_at	4	\N	NO	DateTime64(3)	\N	\N	\N	3
+conformance_fixture	conformance_fixture	orders	note	5	\N	YES	Nullable(String)	\N	\N	\N	\N

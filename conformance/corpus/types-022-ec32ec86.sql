@@ -1,0 +1,1 @@
+SELECT toDate32('1899-12-31') AS d32

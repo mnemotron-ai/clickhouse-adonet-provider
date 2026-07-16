@@ -1,0 +1,10 @@
+﻿namespace Mnemotron.Data.ClickHouse.Types;
+
+internal class UInt256Type : AbstractBigIntegerType
+{
+    public override int Size => 32;
+
+    public override string ToString() => "UInt256";
+
+    public override bool Signed => false;
+}

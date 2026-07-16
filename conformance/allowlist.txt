@@ -1,0 +1,3 @@
+# Temporarily accepted failing gate cases. This list must shrink to empty.
+# Format: <case-id> — <reason> [<owner>]. A green case still listed here
+# fails the gate as stale — remove the line together with the fix.

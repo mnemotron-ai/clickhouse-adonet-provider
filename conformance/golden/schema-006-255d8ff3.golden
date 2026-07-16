@@ -1,0 +1,3 @@
+TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	CHECK_OPTION	IS_UPDATABLE
+String	String	String	String	String
+conformance_fixture	conformance_fixture	orders_view	NONE	NO

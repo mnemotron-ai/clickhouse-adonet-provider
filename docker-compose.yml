@@ -1,0 +1,18 @@
+# Reference ClickHouse for tests and the conformance suite: pinned version,
+# UTC timezone. Version bumps require a full golden regeneration
+# (`make golden`) reviewed in a PR.
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.3.14
+    container_name: ch-oracle
+    environment:
+      TZ: UTC
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    ports:
+      # 18123: avoid clashing with other local ClickHouse instances on 8123
+      - "127.0.0.1:18123:8123"
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

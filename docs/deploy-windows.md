@@ -1,0 +1,158 @@
+# Windows deployment — SSAS server + SSDT machine
+
+Manual/scripted install path for the manual SSAS smoke validation
+(`docs/ssas-smoke-checklist.md`) and, until an MSI installer exists, the only
+install path. Everything here runs from an elevated **Windows PowerShell 5.1**
+prompt (`powershell.exe`, not `pwsh` — GAC installation needs
+`System.EnterpriseServices`, which only exists on the .NET Framework CLR).
+
+One-command install on a box that has the publish folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\register-provider.ps1 -AssemblyPath C:\path\to\publish-net48\Mnemotron.Data.ClickHouse.dll
+powershell -ExecutionPolicy Bypass -File deploy\install-cartridge.ps1        # MD server / SSDT machine only
+```
+
+## 1. Prerequisites
+
+* Build artifacts: `dotnet publish src/Mnemotron.Data.ClickHouse -f net48 -c Release`
+  — copy the whole publish folder to the target machine. It contains
+  `Mnemotron.Data.ClickHouse.dll` plus its dependency closure (22 DLLs:
+  `Microsoft.Extensions.*`, `Microsoft.IO.RecyclableMemoryStream`, `NodaTime`,
+  `System.Text.Json` + BCL facades). All are strong-named (verified
+  2026-07-17 against the net48 publish output).
+* Target machines: SSAS server (MD and/or Tabular instance) and/or the SSDT
+  machine (VS2022 + the «Analysis Services Projects» extension).
+* Local admin rights.
+
+## 2. Install order
+
+1. **`deploy/register-provider.ps1`** — on *both* the SSAS server and the
+   SSDT machine:
+   * GAC-installs the provider **and its dependency closure** (see §4).
+   * Registers the factory in `<system.data><DbProviderFactories>` of
+     machine.config for **both** Framework branches:
+     `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\Config\machine.config`
+     and `%WINDIR%\Microsoft.NET\Framework\v4.0.30319\Config\machine.config`.
+     Edits go through `System.Xml`; a timestamped backup
+     (`machine.config.mnemotron-backup-*`) is written next to each modified
+     file. Re-running is a no-op when the entry is already correct.
+   * Registered entry (Version is read from the assembly at install time):
+
+     ```xml
+     <add name="Mnemotron ADO.NET Data Provider for ClickHouse"
+          invariant="Mnemotron.Data.ClickHouse"
+          description="ADO.NET data provider for ClickHouse over HTTP(S). Unofficial; not affiliated with or endorsed by ClickHouse, Inc."
+          type="Mnemotron.Data.ClickHouse.ADO.ClickHouseConnectionFactory, Mnemotron.Data.ClickHouse, Version=1.0.0.0, Culture=neutral, PublicKeyToken=1a9f1c23413d5b5e" />
+     ```
+
+2. **`deploy/install-cartridge.ps1`** — MD only: copies
+   `cartridge/clickhouse.xsl` into
+   * every discovered `[SSAS instance]\OLAP\bin\Cartridges\` (server side,
+     auto-discovered via `HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\OLAP`
+     with a filesystem fallback), and
+   * the design-time cartridge folders of the Analysis Services Projects
+     extension / legacy SSDT layouts (see §5).
+
+   **Restart the SSAS service and Visual Studio afterwards** — the cartridge
+   list is read at engine startup (confirmed for the server side by Vertica's
+   and Devart's cartridge deployment guidance).
+
+3. **Verify in SSDT** — run the manual SSAS smoke validation
+   (`docs/ssas-smoke-checklist.md`) and record results there.
+
+## 3. Uninstall
+
+```powershell
+powershell -File deploy\install-cartridge.ps1 -Uninstall
+powershell -File deploy\register-provider.ps1 -Uninstall                      # keeps shared deps in GAC
+powershell -File deploy\register-provider.ps1 -Uninstall -RemoveDependencies  # removes them too
+```
+
+`-RemoveDependencies` GAC-removes `Microsoft.Extensions.*` / `System.*` /
+`NodaTime` assemblies that other products may also have GAC'ed — use it only
+when nothing else on the machine consumes them (the GAC is version-side-by-side,
+so *leaving* them is always safe).
+
+## 4. GAC strategy: provider + full dependency closure
+
+Decision: **GAC everything from the net48 publish folder** (provider + 22
+dependency assemblies, all strong-named).
+
+Why not "GAC only the provider":
+
+* SSAS (`msmdsrv.exe`) and VS load the provider from the GAC. Fusion then
+  resolves the provider's references from (a) the GAC, (b) the *host
+  process* appbase — `...\OLAP\bin\` or `...\Common7\IDE\`. There is no
+  per-assembly probing path for GAC-loaded assemblies, and
+  `bindingRedirect` can change a *version*, not a load *location*.
+* Dropping our dependencies into `msmdsrv.exe`'s or `devenv.exe`'s own
+  directory would work but is invasive and fragile across SQL/VS updates —
+  rejected.
+
+Trade-off accepted: the closure includes very common assemblies
+(`System.Buffers`, `System.Memory`, `Microsoft.Extensions.*`). The GAC is
+side-by-side per version+token, so installing them cannot break other
+applications; the only cost is registry/disk clutter and the uninstall care
+described in §3. Collapsing the closure (ILMerge/ILRepack-style single-file
+provider) is deferred to a later milestone — it would shrink the GAC footprint
+to one assembly but needs internalization testing against SSAS.
+
+## 5. Cartridge locations (design time)
+
+Every Analysis Services engine binary reads a `Cartridges` folder next to
+itself (confirmed from decompiled `Microsoft.AnalysisServices.BackEnd`:
+`GetCartridgePath` = executing assembly directory + `\Cartridges`), which is
+why the file must be copied to several places. Known locations, confirmed by
+third-party cartridge deployments (community PostgreSQL cartridge; Microsoft
+HIS troubleshooting doc for `db2v0801.xsl`; Vertica forum guidance):
+
+| Consumer | Path |
+|---|---|
+| SSAS MD server | `%ProgramFiles%\Microsoft SQL Server\MSAS<nn>.<INSTANCE>\OLAP\bin\Cartridges\` |
+| VS2019 AS Projects VSIX | `[VS]\Common7\IDE\CommonExtensions\Microsoft\SSAS\Cartridges\` (+ `LocalServer\cartridges`, `LocalServer\MSOLAP\Cartridges`, `MSOLAP\Cartridges` siblings) |
+| VS2022 AS Projects VSIX | same layout under `C:\Program Files\Microsoft Visual Studio\2022\<Edition>\` — extrapolated from VS2019, `TODO(ssas-smoke)`: confirm on the operator machine |
+| Legacy BIDS/SSDT | `[VS]\Common7\IDE\PrivateAssemblies\DataWarehouseDesigner\UIRdmsCartridge\` |
+| SQL tools VS shell | `[SQL tools]\<ver>\Tools\Binn\VSShell\Common7\IDE\DataWarehouseDesigner\UIRdmsCartridge\` |
+| MSOLAP local engine | `%ProgramFiles%[ (x86)]\Microsoft Analysis Services\AS OLEDB\<ver>\Cartridges\` |
+
+`install-cartridge.ps1` discovers these by searching the install roots for
+`UIRdmsCartridge` folders and for `Cartridges` folders that already contain
+stock cartridges (`sql2000.xsl`). To find them manually:
+
+```powershell
+Get-ChildItem "$env:ProgramFiles\Microsoft Visual Studio","${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Recurse -Directory -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -in 'Cartridges','UIRdmsCartridge' } | Select-Object FullName
+```
+
+## 6. How SSAS picks a cartridge
+
+Confirmed from decompiled `Microsoft.AnalysisServices.BackEnd`
+(`RDMSCartridge.FindCorrectXSL`, `DataSourceUtilities.GetDbProviderNameAndVersion`):
+
+1. The host calls the provider's `GetSchema("DataSourceInformation")` and
+   builds the key `"{DataSourceProductName}.{DataSourceProductVersion}"`.
+2. Every `*.xsl` in the Cartridges folder is scanned for
+   `mssqlcrt:provider` elements (namespace `urn:sql-microsoft-com:sqlcrt`).
+   Elements with `managed="no"` are ignored for ADO.NET connections.
+3. An exact match wins immediately; otherwise the longest matching
+   `type="prefix"` value across all files wins. `sql2000.xsl` carries an
+   empty prefix — the universal fallback (its `[bracket]` identifier quoting
+   is what breaks ClickHouse without our cartridge).
+
+`cartridge/clickhouse.xsl` declares
+`<mssqlcrt:provider type="prefix" managed="yes" native="no">ClickHouse</mssqlcrt:provider>`
+and therefore **requires the provider to report a `DataSourceProductName`
+starting with `ClickHouse`** in `GetSchema("DataSourceInformation")` — see
+limitation 5 below.
+
+## 7. Known limitations and open issues
+
+| # | Limitation | Evidence |
+|---|---|---|
+| 1 | **One data source per DSV.** Multi-source DSVs require `OpenRowset`, unavailable to managed (ADO.NET) providers. Pattern: one model = one ClickHouse source. | CData KB on ADO.NET providers in SSAS |
+| 2 | **Import/processing only.** DirectQuery (Tabular) and ROLAP (MD) have closed provider lists in SSAS; periodic import/processing is the only mode, regardless of provider quality. No writeback. | SSAS documentation on supported DirectQuery/ROLAP sources |
+| 3 | **Bitness.** Both machine.config branches are registered: the SSAS service is 64-bit; VS2022 is 64-bit but older tooling (32-bit VS shells, 32-bit test hosts) reads the 32-bit branch. | — |
+| 4 | **`ClickHouseConnectionFactory.Instance` is a property, not a field.** `DbProviderFactories.GetFactory` (both .NET Framework and .NET) reflects for a public static **field** named `Instance`; a property fails with "does not have an Instance field". The conformance runner masks this by calling `RegisterFactory(invariant, instance)` directly. **Provider visibility in SSDT will fail until `src` changes `Instance` to a `public static readonly` field** — out of scope for the deploy collateral (no code changes), flagged for the provider codebase. | .NET referencesource `DbProviderFactories.GetFactory`; `tools/Conformance.Runner/Program.cs:76` |
+| 5 | **`GetSchema` implements only `Columns`.** SSDT wizards need `MetaDataCollections`, `DataSourceInformation`, `Tables`, `DataTypes`, `Restrictions`, and cartridge selection needs `DataSourceInformation.DataSourceProductName` (see §6). DSV wizard and cartridge matching are expected to fail until those collections land in the provider. | `src/Mnemotron.Data.ClickHouse/Utility/SchemaDescriber.cs` |
+| 6 | **Cartridge is a draft.** `cartridge/clickhouse.xsl` is built from public sources on the cartridge mechanism plus a local synthetic-input transform check (`xsltproc` output executed against a live ClickHouse), not against a live SSAS. Every unverified aspect is marked `TODO(ssas-smoke)` inline. | header of `cartridge/clickhouse.xsl` |

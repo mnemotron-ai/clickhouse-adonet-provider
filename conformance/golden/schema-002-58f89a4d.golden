@@ -1,0 +1,3 @@
+CompositeIdentifierSeparatorPattern	DataSourceProductName	DataSourceProductVersion	DataSourceProductVersionNormalized	GroupByBehavior	IdentifierCase	IdentifierPattern	OrderByColumnsInSelect	ParameterMarkerFormat	ParameterMarkerPattern	ParameterNameMaxLength	ParameterNamePattern	QuotedIdentifierCase	QuotedIdentifierPattern	StatementSeparatorPattern	StringLiteralPattern	SupportedJoinOperators
+String	String	String	String	Int32	Int32	String	Boolean	String	String	Int32	String	Int32	String	String	String	Int32
+\\.	ClickHouse	<version>	<version>	3	2	[A-Za-z_][A-Za-z0-9_]*	false	{{{0}}}	\\{[A-Za-z_][A-Za-z0-9_]*:[^}]+\\}	128	^[A-Za-z_][A-Za-z0-9_]*$	2	"(([^"]|"")*)"	;	\'(([^\']|\'\')*)\'	15
