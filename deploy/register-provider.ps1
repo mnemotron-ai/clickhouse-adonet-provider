@@ -58,6 +58,14 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
+# .NET file APIs used below (AssemblyName.GetAssemblyName, Publish.GacInstall)
+# resolve relative paths against the PROCESS working directory, which does not
+# follow Set-Location in PowerShell — canonicalize early so a relative
+# -AssemblyPath works from any location.
+if (Test-Path -LiteralPath $AssemblyPath) {
+    $AssemblyPath = (Resolve-Path -LiteralPath $AssemblyPath).ProviderPath
+}
+
 # --- Constants ---------------------------------------------------------------
 
 $ProviderInvariant   = 'Mnemotron.Data.ClickHouse'
@@ -97,11 +105,12 @@ $publisher = New-Object System.EnterpriseServices.Internal.Publish
 
 function Get-StrongName([string]$Path) {
     # Returns the AssemblyName or $null when the file is not a strong-named
-    # managed assembly (GAC-ineligible).
+    # managed assembly (GAC-ineligible). Unreadable/missing files raise an
+    # honest error instead of masquerading as a strong-name problem.
     try {
         $an = [System.Reflection.AssemblyName]::GetAssemblyName($Path)
     } catch {
-        return $null
+        throw "Cannot read assembly '$Path': $($_.Exception.Message)"
     }
     $token = $an.GetPublicKeyToken()
     if ($null -eq $token -or $token.Length -eq 0) { return $null }
