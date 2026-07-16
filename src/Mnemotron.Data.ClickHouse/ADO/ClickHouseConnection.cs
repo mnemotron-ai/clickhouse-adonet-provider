@@ -21,6 +21,12 @@ namespace Mnemotron.Data.ClickHouse.ADO;
 
 public class ClickHouseConnection : DbConnection, IClickHouseConnection, ICloneable, IDisposable
 {
+#if NETFRAMEWORK
+    // Second entry point besides the factory: consumers may construct the
+    // connection directly, bypassing ClickHouseConnectionFactory.
+    static ClickHouseConnection() => Utility.NetFxAssemblyResolver.Install();
+#endif
+
     private const string CustomSettingPrefix = "set_";
 
     private readonly List<IDisposable> disposables = new();

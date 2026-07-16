@@ -11,6 +11,10 @@ public class ClickHouseConnectionFactory : DbProviderFactory
     // by reflecting a static field named "Instance".
     public static readonly ClickHouseConnectionFactory Instance = new();
 
+#if NETFRAMEWORK
+    static ClickHouseConnectionFactory() => Utility.NetFxAssemblyResolver.Install();
+#endif
+
     public override DbConnection CreateConnection() => new ClickHouseConnection();
 
     public override DbDataAdapter CreateDataAdapter() => new ClickHouseDataAdapter();
