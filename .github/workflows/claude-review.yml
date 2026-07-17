@@ -60,7 +60,7 @@ jobs:
         if: env.HAS_ANTHROPIC_KEY != 'true'
         run: echo "::notice::ANTHROPIC_API_KEY secret is not configured - skipping automated review (see the header of this workflow file)."
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: env.HAS_ANTHROPIC_KEY == 'true'
         with:
           fetch-depth: 1
@@ -121,7 +121,7 @@ jobs:
       # Base branch only (no `ref:`) — deliberately does not check out the PR
       # head, which may be untrusted fork code. Claude reads the diff via
       # `gh pr diff` instead of local files.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: env.HAS_ANTHROPIC_KEY == 'true'
         with:
           fetch-depth: 1
