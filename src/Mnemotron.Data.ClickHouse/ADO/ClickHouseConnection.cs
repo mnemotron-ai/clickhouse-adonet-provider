@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Mnemotron.Data.ClickHouse.Diagnostic;
 using Mnemotron.Data.ClickHouse.Http;
+using Mnemotron.Data.ClickHouse.Types;
 using Mnemotron.Data.ClickHouse.Utility;
 using Microsoft.Extensions.Logging;
 
@@ -367,7 +368,18 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
 
     internal bool ProbeStringLengths => probeStringLengths;
 
-    internal TypeSettings TypeSettings => new TypeSettings(useCustomDecimals, useServerTimezone ? serverTimezone : TypeSettings.DefaultTimezone, defaultStringSize);
+    internal TypeSettings TypeSettings
+    {
+        get
+        {
+            // Best-effort, one-time: the JSON-support degrade happens once per
+            // process in TypeConverter's static constructor, before any
+            // connection (and its Logger) exists. Surface it here, the first
+            // time a connection with a logger asks for type settings.
+            TypeConverter.LogJsonDegradeIfNeeded(Logger);
+            return new TypeSettings(useCustomDecimals, useServerTimezone ? serverTimezone : TypeSettings.DefaultTimezone, defaultStringSize, Logger);
+        }
+    }
 
     internal ClickHouseUriBuilder CreateUriBuilder(string sql = null) => new ClickHouseUriBuilder(serverUri)
     {

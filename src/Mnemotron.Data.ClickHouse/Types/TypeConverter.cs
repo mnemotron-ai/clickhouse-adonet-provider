@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using System.Threading;
+using Microsoft.Extensions.Logging;
 using Mnemotron.Data.ClickHouse.Formats;
 using Mnemotron.Data.ClickHouse.Numerics;
 using Mnemotron.Data.ClickHouse.Types.Grammar;
@@ -17,6 +19,12 @@ internal static class TypeConverter
     private static readonly Dictionary<string, ClickHouseType> SimpleTypes = [];
     private static readonly Dictionary<string, ParameterizedType> ParameterizedTypes = [];
     private static readonly Dictionary<Type, ClickHouseType> ReverseMapping = [];
+
+    // Captured by the static constructor's JSON-registration catch below; surfaced
+    // (once, process-wide) via LogJsonDegradeIfNeeded the first time a connection
+    // with a Logger asks for TypeSettings. Null when JSON registration succeeded.
+    private static readonly Exception JsonTypesRegistrationError;
+    private static int jsonDegradeLogged; // 0 = not yet logged, 1 = logged
 
     private static readonly Dictionary<string, string> Aliases = new()
     {
@@ -195,9 +203,36 @@ internal static class TypeConverter
         {
             RegisterJsonTypes();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Broken ambient System.Text.Json — degrade: no Json/Object('JSON') support.
+            JsonTypesRegistrationError = ex;
+        }
+    }
+
+    /// <summary>
+    /// Emits a one-time, process-wide warning for the JSON-support degrade caught in
+    /// the static constructor above. That degrade happens at type-initialization time,
+    /// before any <see cref="ADO.ClickHouseConnection"/> (and its Logger) exists, so it
+    /// cannot log itself; instead a connection calls this the first time it resolves
+    /// <see cref="TypeSettings"/>. No-op (and never throws) when there was no degrade,
+    /// it already logged, or <paramref name="logger"/> is null.
+    /// </summary>
+    internal static void LogJsonDegradeIfNeeded(ILogger logger)
+    {
+        if (JsonTypesRegistrationError is null || logger is null || jsonDegradeLogged != 0)
+            return;
+
+        if (Interlocked.CompareExchange(ref jsonDegradeLogged, 1, 0) != 0)
+            return;
+
+        try
+        {
+            logger.LogWarning(JsonTypesRegistrationError, "ClickHouse JSON type support is disabled for this process: the ambient System.Text.Json does not expose System.Text.Json.Nodes. Json/Object('JSON') columns will fail to parse; every other type is unaffected.");
+        }
+        catch
+        {
+            // Never let a broken logger implementation break the connection.
         }
     }
 
@@ -251,6 +286,7 @@ internal static class TypeConverter
             }
             else
             {
+                LogUnsupportedType(settings.logger, node.Value, "cannot split into a modifier and a base type name");
                 throw new ArgumentException($"Cannot parse {node.Value} as type", nameof(node));
             }
         }
@@ -265,7 +301,27 @@ internal static class TypeConverter
             return value.Parse(node, (n) => ParseClickHouseType(n, settings), settings);
         }
 
+        LogUnsupportedType(settings.logger, node.Value, "not a registered simple or parameterized ClickHouse type");
         throw new ArgumentException("Unknown type: " + node.ToString());
+    }
+
+    // Schema/type-resolution time only (once per column, not per row): flags a
+    // ClickHouse type name the provider cannot serve before the caller sees the
+    // ArgumentException. Null-safe and never throws — a broken logger must not
+    // break type resolution.
+    private static void LogUnsupportedType(ILogger logger, string typeName, string reason)
+    {
+        if (logger is null)
+            return;
+
+        try
+        {
+            logger.LogWarning("Unsupported ClickHouse type {TypeName}: {Reason}", typeName, reason);
+        }
+        catch
+        {
+            // Never let a broken logger implementation break type resolution.
+        }
     }
 
     /// <summary>
@@ -370,6 +426,13 @@ internal static class TypeConverter
                 break;
         }
 
+        // ponytail: no LogWarning here on purpose. FromByteCode decodes a per-value
+        // type tag for Dynamic/Json columns (called from DynamicType.Read /
+        // JsonType.ReadJsonNode), so it runs once per cell, not once per column —
+        // logging here would be exactly the per-row flood issue #22 asks us to
+        // avoid. The ArgumentOutOfRangeException below still surfaces the failure
+        // to the caller; see ParseClickHouseType above for the schema-time
+        // (once-per-column) equivalent that does log.
         throw new ArgumentOutOfRangeException(nameof(value), $"Unknown type: {value}");
     }
 }
