@@ -172,10 +172,6 @@ internal static class TypeConverter
         RegisterPlainType<PolygonType>();
         RegisterPlainType<MultiPolygonType>();
 
-        // JSON/Object
-        RegisterPlainType<JsonType>();
-        RegisterParameterizedType<ObjectType>();
-
         RegisterParameterizedType<AggregateFunctionType>();
 
         // Mapping fixups
@@ -188,6 +184,28 @@ internal static class TypeConverter
         ReverseMapping[typeof(DateTimeOffset)] = new DateTimeType();
 
         ReverseMapping[typeof(DBNull)] = new NullableType() { UnderlyingType = new NothingType() };
+
+        // JSON support lives in a separate non-inlined method: some hosts
+        // (VS/SSIS design-time processes) redirect System.Text.Json to an
+        // app-local ancient version without System.Text.Json.Nodes, and a
+        // direct typeof(JsonObject) here would poison the whole type
+        // initializer. Without JSON support the provider still serves every
+        // other ClickHouse type; a Json column then fails its own parse only.
+        try
+        {
+            RegisterJsonTypes();
+        }
+        catch (Exception)
+        {
+            // Broken ambient System.Text.Json — degrade: no Json/Object('JSON') support.
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RegisterJsonTypes()
+    {
+        RegisterPlainType<JsonType>();
+        RegisterParameterizedType<ObjectType>();
         ReverseMapping[typeof(JsonObject)] = new JsonType();
     }
 

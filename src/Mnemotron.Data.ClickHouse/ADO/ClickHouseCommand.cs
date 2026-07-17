@@ -248,11 +248,18 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
         return postMessage;
     }
 
-    private static readonly JsonSerializerOptions SummarySerializerOptions = new JsonSerializerOptions
+    // Separate holder type so a broken ambient System.Text.Json (some VS/SSIS
+    // hosts redirect it to an app-local ancient version — see TypeConverter)
+    // can only fail summary parsing, never ClickHouseCommand's own type
+    // initializer: a poisoned holder rethrows inside the try/catch below.
+    private static class SummarySerializer
     {
-        PropertyNamingPolicy = new SnakeCaseNamingPolicy(),
-        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString,
-    };
+        internal static readonly JsonSerializerOptions Options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = new SnakeCaseNamingPolicy(),
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString,
+        };
+    }
 
     private static QueryStats ExtractQueryStats(HttpResponseMessage response)
     {
@@ -263,7 +270,7 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
             {
                 var value = response.Headers.GetValues(summaryHeader).FirstOrDefault();
                 var jsonDoc = JsonDocument.Parse(value);
-                return JsonSerializer.Deserialize<QueryStats>(value, SummarySerializerOptions);
+                return JsonSerializer.Deserialize<QueryStats>(value, SummarySerializer.Options);
             }
         }
         catch
