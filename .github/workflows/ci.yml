@@ -25,7 +25,7 @@ jobs:
       CH_CONNECTION: Host=localhost;Port=8123;Protocol=http;Username=default
       CLICKHOUSE_CONNECTION: Host=localhost;Port=8123;Protocol=http;Username=default
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 9.0.x # same SDK as dev (global.json): dotnet format rules are SDK-dependent
