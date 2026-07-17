@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,6 +29,12 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
 #endif
 
     private const string CustomSettingPrefix = "set_";
+
+    // Client identification per ClickHouse's integration-development convention:
+    // "<product>/<version>". Computed once from this assembly's informational
+    // version (falling back to the assembly version), with any SemVer build
+    // metadata (e.g. "+<git-sha>" from SourceLink) stripped.
+    private static readonly string ProductUserAgent = BuildProductUserAgent(typeof(ClickHouseConnection).Assembly);
 
     private readonly List<IDisposable> disposables = new();
     private readonly string httpClientName;
@@ -256,8 +263,9 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
             {
                 Content = new StringContent(versionQuery, Encoding.UTF8),
             };
-            AddDefaultHttpHeaders(request.Headers);
-            var response = await HandleError(await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false), versionQuery, activity).ConfigureAwait(false);
+            var httpClient = HttpClient;
+            AddDefaultHttpHeaders(request.Headers, httpClient);
+            var response = await HandleError(await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false), versionQuery, activity).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
             var data = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 #else
@@ -321,7 +329,8 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
 
         var builder = CreateUriBuilder(sql);
         using var postMessage = new HttpRequestMessage(HttpMethod.Post, builder.ToString());
-        AddDefaultHttpHeaders(postMessage.Headers);
+        var httpClient = HttpClient;
+        AddDefaultHttpHeaders(postMessage.Headers, httpClient);
 
         postMessage.Content = content;
         postMessage.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
@@ -329,7 +338,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
         {
             postMessage.Content.Headers.Add("Content-Encoding", "gzip");
         }
-        using var response = await HttpClient.SendAsync(postMessage, HttpCompletionOption.ResponseContentRead, token).ConfigureAwait(false);
+        using var response = await httpClient.SendAsync(postMessage, HttpCompletionOption.ResponseContentRead, token).ConfigureAwait(false);
         await HandleError(response, sql, activity).ConfigureAwait(false);
     }
 
@@ -372,7 +381,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
 
     internal Task EnsureOpenAsync() => state != ConnectionState.Open ? OpenAsync() : Task.CompletedTask;
 
-    internal void AddDefaultHttpHeaders(HttpRequestHeaders headers)
+    internal void AddDefaultHttpHeaders(HttpRequestHeaders headers, HttpClient httpClient)
     {
         headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}")));
         headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -383,6 +392,31 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
             headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
             headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
         }
+
+        // Only set our own User-Agent when nobody already declared one - either
+        // on this request, or as a default header on the (possibly
+        // user-supplied) HttpClient - so a consumer-chosen User-Agent is never
+        // clobbered.
+        if (!headers.Contains("User-Agent") && !httpClient.DefaultRequestHeaders.Contains("User-Agent"))
+        {
+            headers.TryAddWithoutValidation("User-Agent", ProductUserAgent);
+        }
+    }
+
+    private static string BuildProductUserAgent(Assembly assembly)
+    {
+        var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        string version = null;
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            var buildMetadataIndex = informationalVersion.IndexOf('+');
+            version = buildMetadataIndex >= 0 ? informationalVersion.Substring(0, buildMetadataIndex) : informationalVersion;
+        }
+
+        if (string.IsNullOrWhiteSpace(version))
+            version = assembly.GetName().Version?.ToString() ?? "0.0.0";
+
+        return $"{assembly.GetName().Name}/{version}";
     }
 
     internal ClickHouseConnectionStringBuilder ConnectionStringBuilder

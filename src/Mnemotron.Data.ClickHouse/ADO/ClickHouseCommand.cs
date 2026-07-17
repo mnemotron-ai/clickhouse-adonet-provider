@@ -216,17 +216,20 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
         uriBuilder.QueryId = QueryId;
         uriBuilder.CommandQueryStringParameters = customSettings;
 
+        var httpClient = connection.HttpClient;
         using var postMessage = connection.UseFormDataParameters
             ? BuildHttpRequestMessageWithFormData(
                 sqlQuery: sqlQuery,
-                uriBuilder: uriBuilder)
+                uriBuilder: uriBuilder,
+                httpClient: httpClient)
             : BuildHttpRequestMessageWithQueryParams(
                 sqlQuery: sqlQuery,
-                uriBuilder: uriBuilder);
+                uriBuilder: uriBuilder,
+                httpClient: httpClient);
 
         activity.SetQuery(sqlQuery);
 
-        var response = await connection.HttpClient
+        var response = await httpClient
             .SendAsync(postMessage, HttpCompletionOption.ResponseHeadersRead, token)
             .ConfigureAwait(false);
 
@@ -236,7 +239,7 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
         return await ClickHouseConnection.HandleError(response, sqlQuery, activity).ConfigureAwait(false);
     }
 
-    private HttpRequestMessage BuildHttpRequestMessageWithQueryParams(string sqlQuery, ClickHouseUriBuilder uriBuilder)
+    private HttpRequestMessage BuildHttpRequestMessageWithQueryParams(string sqlQuery, ClickHouseUriBuilder uriBuilder, HttpClient httpClient)
     {
         if (commandParameters != null)
         {
@@ -253,7 +256,7 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
 
         var postMessage = new HttpRequestMessage(HttpMethod.Post, uri);
 
-        connection.AddDefaultHttpHeaders(postMessage.Headers);
+        connection.AddDefaultHttpHeaders(postMessage.Headers, httpClient);
         HttpContent content = new StringContent(sqlQuery);
         content.Headers.ContentType = new MediaTypeHeaderValue("text/sql");
         if (connection.UseCompression)
@@ -266,7 +269,7 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
         return postMessage;
     }
 
-    private HttpRequestMessage BuildHttpRequestMessageWithFormData(string sqlQuery, ClickHouseUriBuilder uriBuilder)
+    private HttpRequestMessage BuildHttpRequestMessageWithFormData(string sqlQuery, ClickHouseUriBuilder uriBuilder, HttpClient httpClient)
     {
         var content = new MultipartFormDataContent();
 
@@ -290,7 +293,7 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
 
         var postMessage = new HttpRequestMessage(HttpMethod.Post, uri);
 
-        connection.AddDefaultHttpHeaders(postMessage.Headers);
+        connection.AddDefaultHttpHeaders(postMessage.Headers, httpClient);
 
         postMessage.Content = content;
 
