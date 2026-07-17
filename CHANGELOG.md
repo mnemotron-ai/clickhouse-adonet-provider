@@ -6,6 +6,14 @@ versioning: [SemVer 2.0](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `Mnemotron.Data.ClickHouse.csproj` is now publish-ready as a NuGet package:
+  `PackageReadmeFile` (`PACKAGE.md`, packed at the package root), `Copyright`,
+  `RepositoryType=git`, and deterministic builds (`Deterministic=true`,
+  `ContinuousIntegrationBuild=true` when `CI=true`) alongside the existing
+  `PackageId`/`Description`/`Authors`/`PackageTags`/`PackageProjectUrl`,
+  `PackageLicenseExpression=Apache-2.0`, SourceLink, and symbol package
+  (`.snupkg`) metadata. Publishing (`dotnet nuget push`, an API key in the
+  release workflow) is still deliberately deferred.
 - Fork of ClickHouse.Client 7.14.0 as `Mnemotron.Data.ClickHouse`
   (net462/net48/net8.0, strong-named).
 - Conformance suite: query corpus, golden outputs captured from a pinned

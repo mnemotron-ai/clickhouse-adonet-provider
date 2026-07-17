@@ -15,9 +15,17 @@
     <Authors>Mnemotron AI</Authors>
     <Description>Mnemotron ADO.NET Data Provider for ClickHouse. Unofficial; not affiliated with or endorsed by ClickHouse, Inc.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <Copyright>Copyright 2026 Mnemotron AI</Copyright>
+    <PackageReadmeFile>PACKAGE.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- Reproducible builds: deterministic always; embed the exact source
+         commit in the PDB (ContinuousIntegrationBuild) only in CI, since
+         locally that flag makes debug builds fail on an uncommitted tree. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <LangVersion>latest</LangVersion>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\..\Mnemotron.Data.ClickHouse.snk</AssemblyOriginatorKeyFile>
@@ -41,6 +49,10 @@
 
   <ItemGroup Condition=" $(TargetFramework.StartsWith('net4')) ">
     <Reference Include="System.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="PACKAGE.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
