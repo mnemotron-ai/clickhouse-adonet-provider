@@ -50,6 +50,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
     private bool useServerTimezone;
     private bool useCustomDecimals;
     private int defaultStringSize = TypeSettings.DefaultStringColumnSize;
+    private bool probeStringLengths;
     private TimeSpan timeout;
     private Uri serverUri;
     private Feature supportedFeatures;
@@ -355,6 +356,8 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
 
     internal HttpClient HttpClient => httpClientFactory.CreateClient(httpClientName);
 
+    internal bool ProbeStringLengths => probeStringLengths;
+
     internal TypeSettings TypeSettings => new TypeSettings(useCustomDecimals, useServerTimezone ? serverTimezone : TypeSettings.DefaultTimezone, defaultStringSize);
 
     internal ClickHouseUriBuilder CreateUriBuilder(string sql = null) => new ClickHouseUriBuilder(serverUri)
@@ -401,6 +404,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
                 UseServerTimezone = useServerTimezone,
                 UseCustomDecimals = useCustomDecimals,
                 DefaultStringSize = defaultStringSize,
+                ProbeStringLengths = probeStringLengths,
             };
 
             foreach (var kvp in CustomSettings)
@@ -422,6 +426,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
             useServerTimezone = builder.UseServerTimezone;
             useCustomDecimals = builder.UseCustomDecimals;
             defaultStringSize = builder.DefaultStringSize;
+            probeStringLengths = builder.ProbeStringLengths;
 
             foreach (var key in builder.Keys.Cast<string>().Where(k => k.StartsWith(CustomSettingPrefix, true, CultureInfo.InvariantCulture)))
             {

@@ -44,7 +44,13 @@ internal static class SchemaDescriber
         {
             var chType = reader.GetClickHouseType(ordinal);
 
-            var (columnSize, isLong) = GetStringSizing(chType, reader.TypeSettings.stringColumnSize);
+            // ProbeStringLengths: a measured max length overrides the flat
+            // DefaultStringSize for this column (with headroom), keeping buffers
+            // tight without truncating.
+            var effectiveStringSize = reader.ProbedColumnSizes != null
+                ? ProbedSize(reader.ProbedColumnSizes[ordinal], reader.TypeSettings.stringColumnSize)
+                : reader.TypeSettings.stringColumnSize;
+            var (columnSize, isLong) = GetStringSizing(chType, effectiveStringSize);
             var row = table.NewRow();
             row["ColumnName"] = reader.GetName(ordinal);
             row["ColumnOrdinal"] = ordinal;
@@ -78,6 +84,19 @@ internal static class SchemaDescriber
     // the DefaultStringSize connection setting (0 or >4000 deliberately keeps
     // LOB semantics for genuinely huge columns). Nullable/LowCardinality
     // wrappers are unwrapped first.
+    // Turn a probed max length into a reported width: keep headroom (round up
+    // to the next multiple of 64) so a slightly longer future value does not
+    // truncate. -1 (non-string / not probed) and 0 (all-NULL) fall back to the
+    // flat DefaultStringSize. Values above 4000 stay unbounded (LOB) downstream.
+    private static int ProbedSize(int probedMax, int defaultStringSize)
+    {
+        if (probedMax <= 0)
+            return defaultStringSize;
+        if (probedMax > 4000)
+            return probedMax;
+        return ((probedMax + 63) / 64) * 64;
+    }
+
     private static (int ColumnSize, bool IsLong) GetStringSizing(ClickHouseType chType, int defaultStringSize)
     {
         while (true)

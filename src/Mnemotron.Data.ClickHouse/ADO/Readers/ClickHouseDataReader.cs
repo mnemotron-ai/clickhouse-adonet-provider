@@ -89,6 +89,10 @@ public class ClickHouseDataReader : DbDataReader, IEnumerator<IDataReader>, IEnu
 
     internal TypeSettings TypeSettings { get; }
 
+    // Optional per-ordinal string sizes from ProbeStringLengths (null = not
+    // probed). Used only by GetSchemaTable; never affects value reads.
+    internal int[] ProbedColumnSizes { get; set; }
+
     public override bool GetBoolean(int ordinal) => Convert.ToBoolean(GetValue(ordinal), CultureInfo.InvariantCulture);
 
     public override byte GetByte(int ordinal) => (byte)GetValue(ordinal);

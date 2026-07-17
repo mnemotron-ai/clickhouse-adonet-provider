@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -15,6 +16,7 @@ using Mnemotron.Data.ClickHouse.ADO.Readers;
 using Mnemotron.Data.ClickHouse.Diagnostic;
 using Mnemotron.Data.ClickHouse.Formats;
 using Mnemotron.Data.ClickHouse.Json;
+using Mnemotron.Data.ClickHouse.Types;
 using Mnemotron.Data.ClickHouse.Utility;
 
 namespace Mnemotron.Data.ClickHouse.ADO;
@@ -152,7 +154,54 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
                 break;
         }
         var result = await PostSqlQueryAsync(sqlBuilder.ToString(), lcts.Token).ConfigureAwait(false);
-        return ClickHouseDataReader.FromHttpResponse(result, connection.TypeSettings);
+        var reader = ClickHouseDataReader.FromHttpResponse(result, connection.TypeSettings);
+
+        // ProbeStringLengths: on a metadata read, replace the flat DefaultStringSize
+        // with the actual maximum length of each String column (one aggregate scan).
+        if (behavior == CommandBehavior.SchemaOnly && connection.ProbeStringLengths)
+            reader.ProbedColumnSizes = await ProbeStringLengthsAsync(reader, lcts.Token).ConfigureAwait(false);
+
+        return reader;
+    }
+
+    // Runs SELECT max(lengthUTF8(col)) over the original query for its String
+    // columns (FixedString has a fixed declared length and is skipped; other
+    // types report -1). lengthUTF8 = character count, matching DT_WSTR length;
+    // ClickHouse max() ignores NULLs. Returns a per-ordinal size array or null.
+    private async Task<int[]> ProbeStringLengthsAsync(ClickHouseDataReader reader, CancellationToken token)
+    {
+        var sizes = new int[reader.FieldCount];
+        var projections = new List<string>();
+        var ordinals = new List<int>();
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            sizes[i] = -1;
+            var type = reader.GetClickHouseType(i);
+            var inner = type is NullableType nt ? nt.UnderlyingType : type;
+            if (inner is LowCardinalityType lc)
+                inner = lc.UnderlyingType;
+            if (inner is StringType)
+            {
+                ordinals.Add(i);
+                projections.Add($"toInt64(max(lengthUTF8(`{reader.GetName(i).Replace("`", "``")}`)))");
+            }
+        }
+
+        if (projections.Count == 0)
+            return sizes;
+
+        using var probe = new ClickHouseCommand(connection)
+        {
+            CommandText = $"SELECT {string.Join(", ", projections)} FROM ({CommandText})",
+        };
+        using var probeReader = (ClickHouseDataReader)await probe.ExecuteDbDataReaderAsync(CommandBehavior.Default, token).ConfigureAwait(false);
+        if (await probeReader.ReadAsync(token).ConfigureAwait(false))
+        {
+            for (var j = 0; j < ordinals.Count; j++)
+                sizes[ordinals[j]] = probeReader.IsDBNull(j) ? 0 : (int)Math.Min(int.MaxValue, Convert.ToInt64(probeReader.GetValue(j), CultureInfo.InvariantCulture));
+        }
+
+        return sizes;
     }
 
     private async Task<HttpResponseMessage> PostSqlQueryAsync(string sqlQuery, CancellationToken token)

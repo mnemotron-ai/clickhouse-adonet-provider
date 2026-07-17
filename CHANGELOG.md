@@ -25,3 +25,18 @@ versioning: [SemVer 2.0](https://semver.org/).
 - `Mnemotron.Data.ClickHouse.csproj`: pinned `<AssemblyVersion>1.0.0.0</AssemblyVersion>`
   so the GAC/machine.config identity stays fixed while the package version
   floats per release tag.
+- `GetSchemaTable` reports bounded, non-LOB sizes for `String` columns
+  (`DefaultStringSize`, default 4000) so SSIS keeps them as `DT_WSTR` instead
+  of `DT_NTEXT` — large throughput win for design-time tools.
+- `ProbeStringLengths` connection setting: report each `String` column's actual
+  maximum length (one aggregate scan per schema read) for automatic tight SSIS
+  buffers.
+
+### Fixed
+- Third-party hosts without bindingRedirects (SSAS/SSIS/SSDT): a process-scoped
+  `AssemblyResolve` fallback resolves the GAC dependency closure's internal
+  version mismatches instead of failing with `TypeInitializationException`.
+- `System.Text.Json` usage is isolated from core type initialization so a host
+  that pins an ancient `System.Text.Json` cannot poison the type registry.
+- Factory `Instance` is a `public static readonly` field, as
+  `DbProviderFactories.GetFactory` requires on .NET Framework.

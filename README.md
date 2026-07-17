@@ -22,6 +22,22 @@ client no longer ships .NET Framework targets.
 - Strong-named assemblies, GAC-installable; SQL Server Analysis Services
   deployment collateral (in progress).
 
+## String column sizing (SSIS / SSDT throughput)
+
+`GetSchemaTable` reports a bounded size for `String` columns so ADO.NET
+consumers keep them as inline strings (SSIS `DT_WSTR`) rather than LOBs
+(`DT_NTEXT`), which stream per cell and are far slower. Two connection-string
+settings control this:
+
+- `DefaultStringSize` (default `4000`): the width reported for every unbounded
+  `String` column. Set it to your real maximum to shrink SSIS row buffers;
+  set `0` (or `>4000`) to force LOB semantics for genuinely huge text.
+- `ProbeStringLengths` (default `false`): when `true`, a schema read runs one
+  `max(lengthUTF8(...))` aggregate over the query and reports each `String`
+  column's actual maximum length (with headroom) instead of the flat
+  `DefaultStringSize` — automatic tight buffers, no manual tuning. The probe is
+  a full scan: cheap for import-sized tables, expensive for very large ones.
+
 ## Building
 
 ```sh

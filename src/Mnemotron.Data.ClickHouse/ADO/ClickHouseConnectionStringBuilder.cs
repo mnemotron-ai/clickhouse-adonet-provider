@@ -45,6 +45,19 @@ public class ClickHouseConnectionStringBuilder : DbConnectionStringBuilder
         set => this["DefaultStringSize"] = value;
     }
 
+    /// <summary>
+    /// Gets or sets whether GetSchemaTable probes the actual maximum length of
+    /// each String column (one aggregate scan per schema read) and reports that
+    /// as the column size, instead of the flat DefaultStringSize. Off by default:
+    /// the probe is a full scan, cheap for import-sized tables but expensive for
+    /// very large ones.
+    /// </summary>
+    public bool ProbeStringLengths
+    {
+        get => GetBooleanOrDefault("ProbeStringLengths", false);
+        set => this["ProbeStringLengths"] = value;
+    }
+
     public string Protocol
     {
         get => GetStringOrDefault("Protocol", "http");

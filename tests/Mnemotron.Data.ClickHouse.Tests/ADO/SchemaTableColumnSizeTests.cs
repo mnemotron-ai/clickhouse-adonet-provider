@@ -54,4 +54,39 @@ public class SchemaTableColumnSizeTests : AbstractConnectionTestFixture
         Assert.That(schema.Rows[0]["IsLong"], Is.EqualTo(true));
         Assert.That(schema.Rows[0]["ColumnSize"], Is.EqualTo(-1));
     }
+
+    // ProbeStringLengths: GetSchemaTable reports the actual max length (rounded
+    // up to a multiple of 64 for headroom) instead of the flat DefaultStringSize.
+    [Test]
+    public async Task ShouldProbeActualStringLength()
+    {
+        var builder = TestUtilities.GetConnectionStringBuilder();
+        builder.ProbeStringLengths = true;
+        builder.DefaultStringSize = 4000;
+        using var cn = new ClickHouseConnection(builder.ConnectionString);
+        await cn.OpenAsync();
+        using var cmd = cn.CreateCommand();
+        // longest value is 100 chars -> rounded up to 128, IsLong=false
+        cmd.CommandText = "SELECT repeat('a', number) AS value FROM numbers(101)";
+        using var reader = cmd.ExecuteReader(System.Data.CommandBehavior.SchemaOnly);
+        var schema = reader.GetSchemaTable();
+        Assert.That(schema.Rows[0]["ColumnSize"], Is.EqualTo(128));
+        Assert.That(schema.Rows[0]["IsLong"], Is.EqualTo(false));
+    }
+
+    // An all-NULL / empty String probe falls back to DefaultStringSize.
+    [Test]
+    public async Task ShouldFallBackWhenProbeIsEmpty()
+    {
+        var builder = TestUtilities.GetConnectionStringBuilder();
+        builder.ProbeStringLengths = true;
+        builder.DefaultStringSize = 512;
+        using var cn = new ClickHouseConnection(builder.ConnectionString);
+        await cn.OpenAsync();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT CAST(NULL AS Nullable(String)) AS value";
+        using var reader = cmd.ExecuteReader(System.Data.CommandBehavior.SchemaOnly);
+        var schema = reader.GetSchemaTable();
+        Assert.That(schema.Rows[0]["ColumnSize"], Is.EqualTo(512));
+    }
 }
