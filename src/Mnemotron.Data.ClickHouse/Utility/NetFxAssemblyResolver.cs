@@ -23,6 +23,13 @@ internal static class NetFxAssemblyResolver
 {
     private static int installed;
 
+    // Re-entrancy guard: a probe issued from inside the handler (e.g.
+    // Assembly.LoadWithPartialName missing entirely) raises AssemblyResolve
+    // again for the same name; without the guard that recurses until the
+    // stack is exhausted and the process dies with an access violation.
+    [ThreadStatic]
+    private static HashSet<string> resolving;
+
     // The net48 publish closure (see THIRD-PARTY-NOTICES.md). Keep in sync
     // when dependencies change; the RANGE/SSAS smoke run catches drift.
     private static readonly HashSet<string> KnownDependencies = new(StringComparer.OrdinalIgnoreCase)
@@ -69,21 +76,30 @@ internal static class NetFxAssemblyResolver
             return null;
         }
 
-        if (!KnownDependencies.Contains(requested.Name))
-            return null;
-
-        // Prefer an already-loaded assembly of the same simple name.
-        foreach (var loaded in AppDomain.CurrentDomain.GetAssemblies())
+        // Satellite resource probes (Name ends with ".resources") legitimately
+        // miss for the neutral culture — never ours to answer.
+        if (!KnownDependencies.Contains(requested.Name)
+            || requested.Name.EndsWith(".resources", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.Equals(loaded.GetName().Name, requested.Name, StringComparison.OrdinalIgnoreCase)
-                && TokensMatch(requested, loaded.GetName()))
-            {
-                return loaded;
-            }
+            return null;
         }
+
+        resolving ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!resolving.Add(requested.Name))
+            return null; // already resolving this name further up the stack
 
         try
         {
+            // Prefer an already-loaded assembly of the same simple name.
+            foreach (var loaded in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (string.Equals(loaded.GetName().Name, requested.Name, StringComparison.OrdinalIgnoreCase)
+                    && TokensMatch(requested, loaded.GetName()))
+                {
+                    return loaded;
+                }
+            }
+
             // Newest GAC version of the dependency (the one the provider ships).
 #pragma warning disable CS0618 // partial-name GAC binding is exactly the intent here
             var candidate = Assembly.LoadWithPartialName(requested.Name);
@@ -93,6 +109,10 @@ internal static class NetFxAssemblyResolver
         catch (Exception)
         {
             return null;
+        }
+        finally
+        {
+            resolving.Remove(requested.Name);
         }
     }
 
