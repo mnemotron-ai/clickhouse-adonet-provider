@@ -1,7 +1,10 @@
 #if NETFRAMEWORK
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 
 namespace Mnemotron.Data.ClickHouse.Utility;
@@ -100,11 +103,11 @@ internal static class NetFxAssemblyResolver
                 }
             }
 
-            // Newest GAC version of the dependency (the one the provider ships).
-#pragma warning disable CS0618 // partial-name GAC binding is exactly the intent here
-            var candidate = Assembly.LoadWithPartialName(requested.Name);
-#pragma warning restore CS0618
-            return candidate != null && TokensMatch(requested, candidate.GetName()) ? candidate : null;
+            // The GAC'd version of the dependency (the one the provider ships),
+            // then — for xcopy deployments — a copy sitting next to the provider.
+            // (Assembly.LoadWithPartialName is NOT reliable here: partial-name
+            // GAC binding is a CLR 1.x leftover; proven to miss on CLR 4.)
+            return LoadFromGac(requested) ?? LoadFromProviderDirectory(requested);
         }
         catch (Exception)
         {
@@ -114,6 +117,72 @@ internal static class NetFxAssemblyResolver
         {
             resolving.Remove(requested.Name);
         }
+    }
+
+    // v4 GAC layout: %WINDIR%\Microsoft.NET\assembly\GAC_MSIL\<name>\v4.0_<version>__<token>\<name>.dll
+    // (the same layout the installer relies on). Pick the highest installed
+    // version whose public key token matches the request.
+    private static Assembly LoadFromGac(AssemblyName requested)
+    {
+        var root = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "Microsoft.NET", "assembly", "GAC_MSIL", requested.Name);
+        if (!Directory.Exists(root))
+            return null;
+
+        var wantToken = TokenToString(requested.GetPublicKeyToken());
+        Version bestVersion = null;
+        string bestToken = null;
+        foreach (var dir in Directory.GetDirectories(root))
+        {
+            var leaf = Path.GetFileName(dir);
+            if (leaf == null || !leaf.StartsWith("v4.0_", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var sep = leaf.IndexOf("__", StringComparison.Ordinal);
+            if (sep < 0)
+                continue;
+            var token = leaf.Substring(sep + 2);
+            if (wantToken != null && !string.Equals(token, wantToken, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!Version.TryParse(leaf.Substring(5, sep - 5), out var version))
+                continue;
+            if (!File.Exists(Path.Combine(dir, requested.Name + ".dll")))
+                continue;
+            if (bestVersion == null || version > bestVersion)
+            {
+                bestVersion = version;
+                bestToken = token;
+            }
+        }
+
+        if (bestVersion == null)
+            return null;
+        return Assembly.Load(string.Format(
+            CultureInfo.InvariantCulture,
+            "{0}, Version={1}, Culture=neutral, PublicKeyToken={2}",
+            requested.Name, bestVersion, bestToken));
+    }
+
+    private static Assembly LoadFromProviderDirectory(AssemblyName requested)
+    {
+        var baseDir = Path.GetDirectoryName(typeof(NetFxAssemblyResolver).Assembly.Location);
+        if (string.IsNullOrEmpty(baseDir))
+            return null;
+        var file = Path.Combine(baseDir, requested.Name + ".dll");
+        if (!File.Exists(file))
+            return null;
+        var candidate = Assembly.LoadFrom(file);
+        return TokensMatch(requested, candidate.GetName()) ? candidate : null;
+    }
+
+    private static string TokenToString(byte[] token)
+    {
+        if (token == null || token.Length == 0)
+            return null;
+        var sb = new StringBuilder(token.Length * 2);
+        foreach (var b in token)
+            sb.Append(b.ToString("x2", CultureInfo.InvariantCulture));
+        return sb.ToString();
     }
 
     private static bool TokensMatch(AssemblyName requested, AssemblyName candidate)
