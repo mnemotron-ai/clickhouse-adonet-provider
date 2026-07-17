@@ -26,10 +26,14 @@ public class TypeMappingTests
     [TestCase("Float32", ExpectedResult = typeof(float))]
     [TestCase("Float64", ExpectedResult = typeof(double))]
 
-    [TestCase("Decimal(18,3)", ExpectedResult = typeof(ClickHouseDecimal))]
-    [TestCase("Decimal32(3)", ExpectedResult = typeof(ClickHouseDecimal))]
-    [TestCase("Decimal64(3)", ExpectedResult = typeof(ClickHouseDecimal))]
+    [TestCase("Decimal(18,3)", ExpectedResult = typeof(decimal))]
+    [TestCase("Decimal32(3)", ExpectedResult = typeof(decimal))]
+    [TestCase("Decimal64(3)", ExpectedResult = typeof(decimal))]
     [TestCase("Decimal128(3)", ExpectedResult = typeof(ClickHouseDecimal))]
+    [TestCase("Decimal(18,4)", ExpectedResult = typeof(decimal))]
+    [TestCase("Decimal(28,4)", ExpectedResult = typeof(decimal))]
+    [TestCase("Decimal(29,4)", ExpectedResult = typeof(ClickHouseDecimal))]
+    [TestCase("Decimal(76,6)", ExpectedResult = typeof(ClickHouseDecimal))]
 
     [TestCase("String", ExpectedResult = typeof(string))]
     [TestCase("FixedString(5)", ExpectedResult = typeof(string))]

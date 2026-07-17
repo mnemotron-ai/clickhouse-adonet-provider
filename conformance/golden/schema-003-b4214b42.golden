@@ -9,8 +9,8 @@ DateTime64	\N	8	DateTime64({0})	precision	System.DateTime	false	false	false	true
 Decimal	\N	\N	Decimal({0}, {1})	precision,scale	Mnemotron.Data.ClickHouse.Numerics.ClickHouseDecimal	false	false	false	true	true	false	false	true	false	false	76	0	false	false	\N	\N
 Decimal128	\N	16	Decimal128({0})	scale	Mnemotron.Data.ClickHouse.Numerics.ClickHouseDecimal	false	true	false	true	true	false	false	true	false	false	38	0	false	false	\N	\N
 Decimal256	\N	32	Decimal256({0})	scale	Mnemotron.Data.ClickHouse.Numerics.ClickHouseDecimal	false	false	false	true	true	false	false	true	false	false	76	0	false	false	\N	\N
-Decimal32	\N	4	Decimal32({0})	scale	Mnemotron.Data.ClickHouse.Numerics.ClickHouseDecimal	false	false	false	true	true	false	false	true	false	false	9	0	false	false	\N	\N
-Decimal64	\N	8	Decimal64({0})	scale	Mnemotron.Data.ClickHouse.Numerics.ClickHouseDecimal	false	false	false	true	true	false	false	true	false	false	18	0	false	false	\N	\N
+Decimal32	\N	4	Decimal32({0})	scale	System.Decimal	false	false	false	true	true	false	false	true	false	false	9	0	false	false	\N	\N
+Decimal64	\N	8	Decimal64({0})	scale	System.Decimal	false	false	false	true	true	false	false	true	false	false	18	0	false	false	\N	\N
 Enum16	\N	2	Enum16({0})	definition	System.String	false	false	false	true	false	false	false	true	false	false	\N	\N	false	true	\'	\'
 Enum8	\N	1	Enum8({0})	definition	System.String	false	false	false	true	false	false	false	true	false	false	\N	\N	false	true	\'	\'
 FixedString	\N	\N	FixedString({0})	length	System.String	false	false	true	true	false	false	false	true	true	false	\N	\N	false	true	\'	\'

@@ -200,8 +200,8 @@ public class DapperTests : AbstractConnectionTestFixture
         var sql = @"INSERT INTO test.dapper_decimal (balance) VALUES (@balance)";
         await connection.ExecuteAsync(sql, new { balance = expected });
 
-        var actual = (ClickHouseDecimal)await connection.ExecuteScalarAsync("SELECT * FROM test.dapper_decimal");
-        Assert.That(actual.ToDecimal(CultureInfo.InvariantCulture), Is.EqualTo(expected));
+        var actual = (decimal)await connection.ExecuteScalarAsync("SELECT * FROM test.dapper_decimal");
+        Assert.That(actual, Is.EqualTo(expected));
     }
 
     [Test]

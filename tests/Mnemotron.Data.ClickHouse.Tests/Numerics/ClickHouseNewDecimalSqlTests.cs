@@ -55,8 +55,7 @@ public class ClickHouseNewDecimalSqlTests
         using var reader = await connection.ExecuteReaderAsync($"SELECT CAST('{type.MaxValue}', '{type}')");
         reader.AssertHasFieldCount(1);
         var result = reader.GetEnsureSingleRow().Single();
-        ClassicAssert.IsInstanceOf<ClickHouseDecimal>(result);
-        Assert.That(result, Is.EqualTo(type.MaxValue));
+        AssertDecimalResult(result, type.MaxValue, type);
     }
 
     [Test]
@@ -67,8 +66,7 @@ public class ClickHouseNewDecimalSqlTests
         using var reader = await connection.ExecuteReaderAsync($"SELECT CAST('{type.MinValue}', '{type}')");
         reader.AssertHasFieldCount(1);
         var result = reader.GetEnsureSingleRow().Single();
-        ClassicAssert.IsInstanceOf<ClickHouseDecimal>(result);
-        Assert.That(result, Is.EqualTo(type.MinValue));
+        AssertDecimalResult(result, type.MinValue, type);
     }
 
     [Test]
@@ -78,8 +76,25 @@ public class ClickHouseNewDecimalSqlTests
         using var reader = await connection.ExecuteReaderAsync(sql);
         reader.AssertHasFieldCount(1);
         var result = reader.GetEnsureSingleRow().Single();
-        ClassicAssert.IsInstanceOf<ClickHouseDecimal>(result);
-        Assert.That(result, Is.EqualTo(expected));
+        var actual = result is ClickHouseDecimal chd ? chd : new ClickHouseDecimal((decimal)result);
+        Assert.That(actual, Is.EqualTo(expected));
+    }
+
+    // Decimal(P<=28) now maps to System.Decimal (fits exactly, and lets ADO.NET
+    // consumers treat it as numeric); ClickHouseDecimal is reserved for
+    // oversized decimals (P>28) where System.Decimal would overflow.
+    private static void AssertDecimalResult(object result, ClickHouseDecimal expected, DecimalType type)
+    {
+        if (type.Precision > 28)
+        {
+            ClassicAssert.IsInstanceOf<ClickHouseDecimal>(result);
+            Assert.That(result, Is.EqualTo(expected));
+        }
+        else
+        {
+            ClassicAssert.IsInstanceOf<decimal>(result);
+            Assert.That((decimal)result, Is.EqualTo((decimal)expected));
+        }
     }
 
     [OneTimeTearDown]

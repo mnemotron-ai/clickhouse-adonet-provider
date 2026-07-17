@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer 2.0](https://semver.org/).
@@ -34,6 +34,12 @@ versioning: [SemVer 2.0](https://semver.org/).
   large tables where the per-schema-read scan is too costly.
 
 ### Fixed
+- Decimal columns that fit `System.Decimal` (precision ≤ 28) are now returned
+  as `System.Decimal` instead of the custom `ClickHouseDecimal`, so ADO.NET
+  consumers (SSIS/SSAS) map them to native numeric (`DT_NUMERIC`) rather than
+  `DT_NTEXT`. `ClickHouseDecimal` is still used for Decimal(P>28) where
+  `System.Decimal` would overflow; `UseCustomDecimals=false` forces
+  `System.Decimal` for those too (accepting the overflow risk).
 - Third-party hosts without bindingRedirects (SSAS/SSIS/SSDT): a process-scoped
   `AssemblyResolve` fallback resolves the GAC dependency closure's internal
   version mismatches instead of failing with `TypeInitializationException`.

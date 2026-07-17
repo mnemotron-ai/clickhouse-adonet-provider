@@ -38,7 +38,18 @@ internal class DecimalType : ParameterizedType
     /// </summary>
     public virtual int Size => GetSizeFromPrecision(Precision);
 
-    public override Type FrameworkType => UseBigDecimal ? typeof(ClickHouseDecimal) : typeof(decimal);
+    // System.Decimal holds up to 28 digits; beyond that it overflows, so
+    // Decimal(P>28) must use ClickHouseDecimal regardless of the flag. Fitting
+    // decimals stay System.Decimal so ADO.NET consumers (SSIS/SSAS) recognize
+    // them as numeric (DT_NUMERIC) rather than falling back to DT_NTEXT.
+    // System.Decimal holds up to 28 digits exactly, so ClickHouseDecimal adds
+    // nothing for Decimal(P<=28) — and using it there makes ADO.NET consumers
+    // (SSIS/SSAS) fall back to DT_NTEXT instead of DT_NUMERIC. Reserve the
+    // custom type for genuinely oversized decimals; UseBigDecimal (default on)
+    // only takes effect where it is actually needed.
+    private bool UseBigDecimalEffective => UseBigDecimal && Precision > 28;
+
+    public override Type FrameworkType => UseBigDecimalEffective ? typeof(ClickHouseDecimal) : typeof(decimal);
 
     public ClickHouseDecimal MaxValue => new(BigInteger.Pow(10, Precision) - 1, Scale);
 
@@ -63,7 +74,7 @@ internal class DecimalType : ParameterizedType
 
     public override object Read(ExtendedBinaryReader reader)
     {
-        if (UseBigDecimal)
+        if (UseBigDecimalEffective)
         {
             var mantissa = Size switch
             {
