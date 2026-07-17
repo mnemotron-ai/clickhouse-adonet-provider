@@ -74,6 +74,22 @@ public class SchemaTableColumnSizeTests : AbstractConnectionTestFixture
         Assert.That(schema.Rows[0]["IsLong"], Is.EqualTo(false));
     }
 
+    // ProbeStringLengths is on by default: a SchemaOnly read with no explicit
+    // setting probes actual widths rather than reporting the flat 4000.
+    [Test]
+    public async Task ShouldProbeByDefault()
+    {
+        var builder = TestUtilities.GetConnectionStringBuilder();
+        Assert.That(builder.ProbeStringLengths, Is.True);
+        using var cn = new ClickHouseConnection(builder.ConnectionString);
+        await cn.OpenAsync();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT repeat('a', number) AS value FROM numbers(51)"; // max 50 -> 64
+        using var reader = cmd.ExecuteReader(System.Data.CommandBehavior.SchemaOnly);
+        var schema = reader.GetSchemaTable();
+        Assert.That(schema.Rows[0]["ColumnSize"], Is.EqualTo(64));
+    }
+
     // An all-NULL / empty String probe falls back to DefaultStringSize.
     [Test]
     public async Task ShouldFallBackWhenProbeIsEmpty()

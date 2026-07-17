@@ -192,3 +192,31 @@ limitation 5 below.
 | 4 | **`ClickHouseConnectionFactory.Instance` is a property, not a field.** `DbProviderFactories.GetFactory` (both .NET Framework and .NET) reflects for a public static **field** named `Instance`; a property fails with "does not have an Instance field". The conformance runner masks this by calling `RegisterFactory(invariant, instance)` directly. **Provider visibility in SSDT will fail until `src` changes `Instance` to a `public static readonly` field** — out of scope for the deploy collateral (no code changes), flagged for the provider codebase. | .NET referencesource `DbProviderFactories.GetFactory`; `tools/Conformance.Runner/Program.cs:76` |
 | 5 | **`GetSchema` implements only `Columns`.** SSDT wizards need `MetaDataCollections`, `DataSourceInformation`, `Tables`, `DataTypes`, `Restrictions`, and cartridge selection needs `DataSourceInformation.DataSourceProductName` (see §6). DSV wizard and cartridge matching are expected to fail until those collections land in the provider. | `src/Mnemotron.Data.ClickHouse/Utility/SchemaDescriber.cs` |
 | 6 | **Cartridge is a draft.** `cartridge/clickhouse.xsl` is built from public sources on the cartridge mechanism plus a local synthetic-input transform check (`xsltproc` output executed against a live ClickHouse), not against a live SSAS. Every unverified aspect is marked `TODO(ssas-smoke)` inline. | header of `cartridge/clickhouse.xsl` |
+
+## 8. String column sizing and throughput (`ProbeStringLengths`)
+
+ClickHouse `String` is unbounded, but SSIS/SSAS must map every string column to
+a fixed width. Reporting a flat 4000 keeps them out of LOB (`DT_NTEXT`) handling
+but bloats the row buffer for narrow columns — a wide view can spend most of its
+buffer on empty space, collapsing throughput.
+
+**`ProbeStringLengths` is on by default.** On each schema read the provider runs
+one `max(lengthUTF8(col))` aggregate over the query and reports each String
+column's actual maximum width (rounded up for headroom), so SSIS buffers stay
+tight automatically. This is what makes a real import fast — no manual tuning.
+
+**Caveat — this default trades cheap metadata for tight buffers. Turn it off for
+very large tables:**
+
+- **Cost:** the probe is a **full aggregate scan** of the query, run at design
+  time *and* at every runtime validation. Milliseconds for import-sized tables;
+  a heavy, repeated scan for tables of hundreds of millions / billions of rows.
+- **Truncation:** probed widths reflect the data *at probe time*. If a column
+  later gains longer values, the width frozen in the SSIS package can truncate
+  (SSIS fails or loses data). Re-refresh the source metadata after significant
+  data growth.
+- **To disable:** add `ProbeStringLengths=false` to the connection string. The
+  provider then reports the flat `DefaultStringSize` (default 4000, the safe
+  `DT_WSTR` ceiling — no truncation, no LOB). Set `DefaultStringSize` to your
+  known maximum for a no-scan middle ground (e.g. `DefaultStringSize=2000`), or
+  `0`/`>4000` to force LOB semantics for genuinely huge text columns.

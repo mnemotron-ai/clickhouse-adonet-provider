@@ -48,13 +48,14 @@ public class ClickHouseConnectionStringBuilder : DbConnectionStringBuilder
     /// <summary>
     /// Gets or sets whether GetSchemaTable probes the actual maximum length of
     /// each String column (one aggregate scan per schema read) and reports that
-    /// as the column size, instead of the flat DefaultStringSize. Off by default:
-    /// the probe is a full scan, cheap for import-sized tables but expensive for
-    /// very large ones.
+    /// as the column size, instead of the flat DefaultStringSize. On by default:
+    /// it keeps SSIS/SSAS row buffers tight without manual tuning. The probe is
+    /// a full scan — cheap for import-sized tables, expensive for very large
+    /// ones; set false (and tune DefaultStringSize) for those.
     /// </summary>
     public bool ProbeStringLengths
     {
-        get => GetBooleanOrDefault("ProbeStringLengths", false);
+        get => GetBooleanOrDefault("ProbeStringLengths", true);
         set => this["ProbeStringLengths"] = value;
     }
 

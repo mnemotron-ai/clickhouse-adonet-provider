@@ -50,7 +50,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
     private bool useServerTimezone;
     private bool useCustomDecimals;
     private int defaultStringSize = TypeSettings.DefaultStringColumnSize;
-    private bool probeStringLengths;
+    private bool probeStringLengths = true;
     private TimeSpan timeout;
     private Uri serverUri;
     private Feature supportedFeatures;

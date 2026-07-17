@@ -28,9 +28,10 @@ versioning: [SemVer 2.0](https://semver.org/).
 - `GetSchemaTable` reports bounded, non-LOB sizes for `String` columns
   (`DefaultStringSize`, default 4000) so SSIS keeps them as `DT_WSTR` instead
   of `DT_NTEXT` — large throughput win for design-time tools.
-- `ProbeStringLengths` connection setting: report each `String` column's actual
-  maximum length (one aggregate scan per schema read) for automatic tight SSIS
-  buffers.
+- `ProbeStringLengths` connection setting (**on by default**): report each
+  `String` column's actual maximum length (one aggregate scan per schema read)
+  for automatic tight SSIS buffers. Set `ProbeStringLengths=false` for very
+  large tables where the per-schema-read scan is too costly.
 
 ### Fixed
 - Third-party hosts without bindingRedirects (SSAS/SSIS/SSDT): a process-scoped

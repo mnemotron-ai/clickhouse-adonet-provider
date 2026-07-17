@@ -32,11 +32,15 @@ settings control this:
 - `DefaultStringSize` (default `4000`): the width reported for every unbounded
   `String` column. Set it to your real maximum to shrink SSIS row buffers;
   set `0` (or `>4000`) to force LOB semantics for genuinely huge text.
-- `ProbeStringLengths` (default `false`): when `true`, a schema read runs one
+- `ProbeStringLengths` (default `true`): a schema read runs one
   `max(lengthUTF8(...))` aggregate over the query and reports each `String`
   column's actual maximum length (with headroom) instead of the flat
   `DefaultStringSize` — automatic tight buffers, no manual tuning. The probe is
-  a full scan: cheap for import-sized tables, expensive for very large ones.
+  a full scan: cheap for import-sized tables, expensive for very large ones —
+  set `ProbeStringLengths=false` (and tune `DefaultStringSize`) for those. Note
+  that probed widths reflect current data, so a package's frozen metadata can
+  truncate if a column later grows; re-refresh the source metadata after
+  significant data growth, or disable probing.
 
 ## Building
 
