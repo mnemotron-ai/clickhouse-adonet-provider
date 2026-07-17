@@ -27,9 +27,10 @@ public class ClickHouseDataReader : DbDataReader, IEnumerator<IDataReader>, IEnu
     private readonly HttpResponseMessage httpResponse; // Used to dispose at the end of reader
     private readonly ExtendedBinaryReader reader;
 
-    private ClickHouseDataReader(HttpResponseMessage httpResponse, ExtendedBinaryReader reader, string[] names, ClickHouseType[] types, string[] typeNames)
+    private ClickHouseDataReader(HttpResponseMessage httpResponse, ExtendedBinaryReader reader, string[] names, ClickHouseType[] types, string[] typeNames, TypeSettings settings)
     {
         this.httpResponse = httpResponse ?? throw new ArgumentNullException(nameof(httpResponse));
+        TypeSettings = settings;
         this.reader = reader ?? throw new ArgumentNullException(nameof(reader));
         RawTypes = types;
         RawTypeNames = typeNames;
@@ -46,7 +47,7 @@ public class ClickHouseDataReader : DbDataReader, IEnumerator<IDataReader>, IEnu
             var stream = new BufferedStream(httpResponse.Content.ReadAsStreamAsync().GetAwaiter().GetResult(), BufferSize);
             reader = new ExtendedBinaryReader(stream); // will dispose of stream
             var (names, types, typeNames) = ReadHeaders(reader, settings);
-            return new ClickHouseDataReader(httpResponse, reader, names, types, typeNames);
+            return new ClickHouseDataReader(httpResponse, reader, names, types, typeNames, settings);
         }
         catch (Exception)
         {
@@ -85,6 +86,8 @@ public class ClickHouseDataReader : DbDataReader, IEnumerator<IDataReader>, IEnu
     private protected ClickHouseType[] RawTypes { get; set; }
 
     private protected string[] RawTypeNames { get; set; }
+
+    internal TypeSettings TypeSettings { get; }
 
     public override bool GetBoolean(int ordinal) => Convert.ToBoolean(GetValue(ordinal), CultureInfo.InvariantCulture);
 

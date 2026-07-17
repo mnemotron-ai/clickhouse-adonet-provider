@@ -1,4 +1,4 @@
-// GetSchema support (FR-5/FR-6): the seven standard ADO.NET schema collections
+﻿// GetSchema support (FR-5/FR-6): the seven standard ADO.NET schema collections
 // in the shapes SSDT's DSV/Import wizards expect (Microsoft "Common Schema
 // Collections", DbMetaDataCollectionNames/DbMetaDataColumnNames).
 // Tables/Views/Columns are served from system.tables / system.columns with
@@ -47,7 +47,7 @@ internal static class SchemaDescriber
             var row = table.NewRow();
             row["ColumnName"] = reader.GetName(ordinal);
             row["ColumnOrdinal"] = ordinal;
-            row["ColumnSize"] = -1;
+            row["ColumnSize"] = GetColumnSize(chType, reader.TypeSettings.stringColumnSize);
             row["DataType"] = chType is NullableType nt ? nt.UnderlyingType.FrameworkType : chType.FrameworkType;
             row["ProviderType"] = chType;
             row["IsLong"] = chType is StringType;
@@ -67,6 +67,30 @@ internal static class SchemaDescriber
             table.Rows.Add(row);
         }
         return table;
+    }
+
+    // Unbounded String columns get a bounded reported size (connection setting
+    // DefaultStringSize): ADO.NET consumers treat sizeless strings as LOBs
+    // (SSIS: DT_NTEXT with per-cell spooling), which is both slow and wrong
+    // for typical warehouse columns. FixedString reports its declared length.
+    private static int GetColumnSize(ClickHouseType chType, int defaultStringSize)
+    {
+        while (true)
+        {
+            switch (chType)
+            {
+                case NullableType nt:
+                    chType = nt.UnderlyingType;
+                    continue;
+                case LowCardinalityType lc:
+                    chType = lc.UnderlyingType;
+                    continue;
+                case FixedStringType fs:
+                    return fs.Length;
+                default:
+                    return chType.FrameworkType == typeof(string) && defaultStringSize > 0 ? defaultStringSize : -1;
+            }
+        }
     }
 
     public static DataTable DescribeSchema(this ClickHouseConnection connection, string collectionName, string[] restrictions)

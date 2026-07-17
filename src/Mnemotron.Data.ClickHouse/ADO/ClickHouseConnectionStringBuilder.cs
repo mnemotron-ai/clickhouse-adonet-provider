@@ -33,6 +33,18 @@ public class ClickHouseConnectionStringBuilder : DbConnectionStringBuilder
         set => this["Password"] = value;
     }
 
+    /// <summary>
+    /// Gets or sets the column size reported by GetSchemaTable for unbounded
+    /// String columns. Bounded sizes keep ADO.NET consumers (SSIS buffers,
+    /// SSAS/SSDT) on fixed-width string handling instead of per-cell LOB
+    /// spooling. Default: 4000.
+    /// </summary>
+    public int DefaultStringSize
+    {
+        get => GetIntOrDefault("DefaultStringSize", TypeSettings.DefaultStringColumnSize);
+        set => this["DefaultStringSize"] = value;
+    }
+
     public string Protocol
     {
         get => GetStringOrDefault("Protocol", "http");
