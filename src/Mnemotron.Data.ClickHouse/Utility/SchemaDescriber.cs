@@ -44,13 +44,14 @@ internal static class SchemaDescriber
         {
             var chType = reader.GetClickHouseType(ordinal);
 
+            var (columnSize, isLong) = GetStringSizing(chType, reader.TypeSettings.stringColumnSize);
             var row = table.NewRow();
             row["ColumnName"] = reader.GetName(ordinal);
             row["ColumnOrdinal"] = ordinal;
-            row["ColumnSize"] = GetColumnSize(chType, reader.TypeSettings.stringColumnSize);
+            row["ColumnSize"] = columnSize;
             row["DataType"] = chType is NullableType nt ? nt.UnderlyingType.FrameworkType : chType.FrameworkType;
             row["ProviderType"] = chType;
-            row["IsLong"] = chType is StringType;
+            row["IsLong"] = isLong;
             row["AllowDBNull"] = chType is NullableType;
             row["IsReadOnly"] = true;
             row["IsRowVersion"] = false;
@@ -69,11 +70,15 @@ internal static class SchemaDescriber
         return table;
     }
 
-    // Unbounded String columns get a bounded reported size (connection setting
-    // DefaultStringSize): ADO.NET consumers treat sizeless strings as LOBs
-    // (SSIS: DT_NTEXT with per-cell spooling), which is both slow and wrong
-    // for typical warehouse columns. FixedString reports its declared length.
-    private static int GetColumnSize(ClickHouseType chType, int defaultStringSize)
+    // ADO.NET consumers decide LOB-vs-inline string handling from BOTH IsLong
+    // and ColumnSize, and IsLong wins: the SSIS ADO NET Source maps any column
+    // with IsLong=true to DT_NTEXT (per-cell LOB spooling) regardless of the
+    // reported size. So a bounded String must report IsLong=false AND a bounded
+    // ColumnSize. FixedString(N) is always bounded; an unbounded String uses
+    // the DefaultStringSize connection setting (0 or >4000 deliberately keeps
+    // LOB semantics for genuinely huge columns). Nullable/LowCardinality
+    // wrappers are unwrapped first.
+    private static (int ColumnSize, bool IsLong) GetStringSizing(ClickHouseType chType, int defaultStringSize)
     {
         while (true)
         {
@@ -86,9 +91,13 @@ internal static class SchemaDescriber
                     chType = lc.UnderlyingType;
                     continue;
                 case FixedStringType fs:
-                    return fs.Length;
+                    return (fs.Length, false);
                 default:
-                    return chType.FrameworkType == typeof(string) && defaultStringSize > 0 ? defaultStringSize : -1;
+                    if (chType.FrameworkType != typeof(string))
+                        return (-1, false);
+                    return defaultStringSize > 0 && defaultStringSize <= 4000
+                        ? (defaultStringSize, false)
+                        : (-1, true);
             }
         }
     }
