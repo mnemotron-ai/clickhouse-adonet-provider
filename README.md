@@ -50,7 +50,8 @@ make ci                # lint + build + tests + conformance
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and
-`conformance/README.md` for the conformance test suite.
+`conformance/README.md` for the conformance test suite. Supported ClickHouse
+server range and SSAS/VS/SSIS versions: [docs/support-matrix.md](docs/support-matrix.md).
 
 ## Contributing
 

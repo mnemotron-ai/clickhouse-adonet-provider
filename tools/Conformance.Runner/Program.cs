@@ -106,10 +106,18 @@ internal static class Program
         if (Directory.Exists(actualDir)) Directory.Delete(actualDir, true); // determinism: wipe first
         Directory.CreateDirectory(actualDir);
 
+#if NETFRAMEWORK
+        // .NET Framework's DbProviderFactories has no programmatic
+        // RegisterFactory API (registration there is machine.config-only,
+        // which register-provider.ps1 exercises separately) - use the
+        // factory singleton directly.
+        var factory = Mnemotron.Data.ClickHouse.ADO.ClickHouseConnectionFactory.Instance;
+#else
         // The System.Data.Common consumer path: register + resolve by invariant name.
         DbProviderFactories.RegisterFactory("Mnemotron.Data.ClickHouse",
             Mnemotron.Data.ClickHouse.ADO.ClickHouseConnectionFactory.Instance);
         var factory = DbProviderFactories.GetFactory("Mnemotron.Data.ClickHouse");
+#endif
 
         var failures = 0;
         foreach (var file in Cases(corpusDir))
@@ -287,8 +295,9 @@ internal static class Program
         var t = chType;
         while (true) // strip wrappers: the policy applies to the inner type
         {
-            if (t.StartsWith("Nullable(")) t = t[9..^1];
-            else if (t.StartsWith("LowCardinality(")) t = t[15..^1];
+            // Substring, not the range operator: net48 lacks System.Index/System.Range.
+            if (t.StartsWith("Nullable(")) t = t.Substring(9, t.Length - 9 - 1);
+            else if (t.StartsWith("LowCardinality(")) t = t.Substring(15, t.Length - 15 - 1);
             else break;
         }
         foreach (var (prefix, mode) in p.Modes)
@@ -317,10 +326,10 @@ internal static class Program
     private static string NormDt(string s)
     {
         var t = s.Contains('.') ? s.TrimEnd('0').TrimEnd('.') : s;
-        return t.EndsWith(" 00:00:00") ? t[..^9] : t;
+        return t.EndsWith(" 00:00:00") ? t.Substring(0, t.Length - 9) : t;
     }
 
-    private static string NormDate(string s) => s.EndsWith(" 00:00:00") ? s[..^9] : s;
+    private static string NormDate(string s) => s.EndsWith(" 00:00:00") ? s.Substring(0, s.Length - 9) : s;
 
     private static string NormFrac(string s) => s.Contains('.') ? s.TrimEnd('0').TrimEnd('.') : s;
 
@@ -333,7 +342,7 @@ internal static class Program
     {
         var policy = LoadPolicy(policyPath);
         var allow = allowlistPath != null && File.Exists(allowlistPath)
-            ? File.ReadAllLines(allowlistPath).Where(l => !l.StartsWith('#') && l.Trim().Length > 0)
+            ? File.ReadAllLines(allowlistPath).Where(l => !l.StartsWith("#") && l.Trim().Length > 0)
                 .Select(l => l.Split('—', ' ')[0].Trim()).ToHashSet()
             : [];
         var red = new List<string>();
@@ -369,7 +378,7 @@ internal static class Program
         if (!File.Exists(actualFile)) return "no actual output";
         var g = File.ReadAllLines(goldenFile);
         var a = File.ReadAllLines(actualFile);
-        if (a.Length > 0 && a[0].StartsWith("!ERROR")) return "provider error: " + a[0][7..];
+        if (a.Length > 0 && a[0].StartsWith("!ERROR")) return "provider error: " + a[0].Substring(7);
         if (g.Length < 2) return "malformed golden";
         if (a.Length < 2) return "malformed actual";
         if (g[0] != a[0]) return $"column names: golden [{g[0]}] vs actual [{a[0]}]";
