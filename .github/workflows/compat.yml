@@ -1,0 +1,59 @@
+# Compatibility signal (non-blocking) across the supported ClickHouse range.
+#
+# The merge gate (.github/workflows/ci.yml) proves every PR against exactly
+# the pinned server (25.3.14, same as docker-compose.yml) via golden-compare
+# replay. That comparison is version-bound: the schema-* conformance goldens
+# read live system.* tables, whose shape is not stable across ClickHouse
+# versions, so golden-compare against any other version is not meaningful.
+#
+# This workflow instead runs the unit test suite (`make test`) with
+# CLICKHOUSE_VERSION set per matrix entry. The suite self-gates on that
+# variable (see tests/Mnemotron.Data.ClickHouse.Tests/TestUtilities.cs and
+# the FromVersion / IgnoreInVersion attributes), skipping tests that need a
+# feature the running server doesn't have instead of failing. See
+# docs/support-matrix.md for the full rationale and the floor decision.
+#
+# Scheduled + manual only — never runs on pull requests, so it cannot block
+# a merge. A red leg here is triage signal for a maintainer: fix a real
+# incompatibility, document a known limitation, or move the supported floor.
+name: compat
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # weekly, Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compat:
+    # Scheduled runs only matter for the canonical repository; skip on forks.
+    if: github.repository == 'mnemotron-ai/clickhouse-adonet-provider'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        clickhouse: ['24.8', '25.3.14', 'latest']
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:${{ matrix.clickhouse }}
+        env:
+          TZ: UTC
+          CLICKHOUSE_SKIP_USER_SETUP: "1"
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-interval 5s
+          --health-retries 30
+    env:
+      CLICKHOUSE_VERSION: ${{ matrix.clickhouse }}
+      CLICKHOUSE_CONNECTION: Host=localhost;Port=8123;Protocol=http;Username=default
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 9.0.x
+      - name: Unit tests against ClickHouse ${{ matrix.clickhouse }}
+        run: make test
