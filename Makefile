@@ -6,7 +6,7 @@
 RUNNER = dotnet run --project tools/Conformance.Runner -c Release -f net8.0 --
 export CLICKHOUSE_CONNECTION ?= Host=localhost;Port=18123;Protocol=http;Username=default
 
-.PHONY: golden golden-schema fixture replay conformance lint test build ci hooks oracle-up self-parity replay-net48 conformance-net48
+.PHONY: golden golden-schema fixture replay conformance lint test build ci hooks oracle-up self-parity replay-net48 conformance-net48 merge-net48
 
 oracle-up:
 	docker compose up -d --wait
@@ -69,3 +69,19 @@ ci: lint build test replay conformance
 
 hooks:
 	git config core.hooksPath .githooks
+
+# Release-time only (issue #5): merge the published net48 provider +
+# dependency closure into one strong-named assembly via ILRepack, for the
+# additive provider-net48-merged/ payload in the release zip. Expects
+# publish/provider-net48 to already exist (release.yml publishes it first).
+# NOT wired into `ci` — the merge is exercised only when release.yml runs
+# on a tag push.
+merge-net48:
+	dotnet tool restore
+	rm -rf publish/provider-net48-merged
+	mkdir -p publish/provider-net48-merged
+	cd publish/provider-net48 && dotnet ilrepack /internalize \
+		/keyfile:$(CURDIR)/Mnemotron.Data.ClickHouse.snk \
+		/lib:$(HOME)/.nuget/packages/microsoft.netframework.referenceassemblies.net48/1.0.3/build/.NETFramework/v4.8 \
+		/out:$(CURDIR)/publish/provider-net48-merged/Mnemotron.Data.ClickHouse.dll \
+		Mnemotron.Data.ClickHouse.dll $$(ls *.dll | grep -v '^Mnemotron.Data.ClickHouse.dll$$')

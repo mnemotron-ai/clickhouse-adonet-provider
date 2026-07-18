@@ -21,6 +21,10 @@ namespace Mnemotron.Data.ClickHouse.Utility;
 /// Instead of editing host configs, resolve the failed load to the version
 /// that ships with the provider. The handler fires only after a load has
 /// already FAILED, and only for the provider's own dependency names.
+///
+/// Inert for the additive ILRepack-merged single-assembly payload (issue #5,
+/// `make merge-net48`): a merged deployment never requests a separate
+/// dependency name, so <see cref="Resolve"/> never matches anything.
 /// </summary>
 internal static class NetFxAssemblyResolver
 {
