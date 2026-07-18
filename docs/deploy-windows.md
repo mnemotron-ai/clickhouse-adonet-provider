@@ -46,10 +46,11 @@ Studio) and work through `docs/ssas-smoke-checklist.md`.
 
 * Build artifacts: `dotnet publish src/Mnemotron.Data.ClickHouse -f net48 -c Release`
   — copy the whole publish folder to the target machine. It contains
-  `Mnemotron.Data.ClickHouse.dll` plus its dependency closure (22 DLLs:
+  `Mnemotron.Data.ClickHouse.dll` plus its dependency closure (20 DLLs:
   `Microsoft.Extensions.*`, `Microsoft.IO.RecyclableMemoryStream`, `NodaTime`,
   `System.Text.Json` + BCL facades). All are strong-named (verified
-  2026-07-17 against the net48 publish output).
+  2026-07-18 against the net48 publish output; `System.ValueTuple` left the
+  closure with Microsoft.Extensions.Http 10).
 * Target machines: SSAS server (MD and/or Tabular instance) and/or the SSDT
   machine (VS2022 + the «Analysis Services Projects» extension).
 * Local admin rights.

@@ -57,7 +57,6 @@ internal static class NetFxAssemblyResolver
         "System.Text.Encodings.Web",
         "System.Text.Json",
         "System.Threading.Tasks.Extensions",
-        "System.ValueTuple",
     };
 
     internal static void Install()
