@@ -31,7 +31,7 @@ corpus/*.json ──make golden-schema──▶ GetSchema through the provider �
 |---|---|
 | `src/Mnemotron.Data.ClickHouse/` | the provider (fork of ClickHouse.Client 7.14.0, MIT notices preserved) |
 | `src/Mnemotron.Data.ClickHouse/Utility/SchemaDescriber.cs` | `GetSchema` collections (standard ADO.NET shapes) |
-| `tools/Conformance.Runner/` | golden/golden-schema/replay/compare/fixture CLI (net8) |
+| `tools/Conformance.Runner/` | golden/golden-schema/replay/compare/fixture CLI (net8 + net48-under-mono) |
 | `tools/Installer/` | Setup.exe/Uninstall.exe (net48): C# port of `deploy/*.ps1` — GAC + machine.config + cartridge install/uninstall, no PowerShell required |
 | `tools/Installer/INSTALL.md` | short quick-start copied into the release zip alongside Setup.exe/Uninstall.exe |
 | `conformance/corpus/` | inputs: `<class>-NNN-<hash8>.sql` (queries) and `.json` (schema cases) |
@@ -53,6 +53,7 @@ corpus/*.json ──make golden-schema──▶ GetSchema through the provider �
 | `.github/workflows/ci.yml` | CI gate: live replay vs a ClickHouse service container |
 | `.github/workflows/windows.yml` | Windows compile check (path-filtered) |
 | `.github/workflows/compat.yml` | scheduled/manual, non-blocking: unit test suite across the ClickHouse support matrix (24.8 .. latest); see `docs/support-matrix.md` |
+| `.github/workflows/net48-replay.yml` | live conformance replay on net48 under mono, ubuntu; `continue-on-error` during bring-up (issue #3) |
 | `.github/workflows/release.yml` | tag-driven (`v*`) release: publishes the provider + Setup.exe, assembles the Windows installer zip, creates the GitHub release |
 | `.github/workflows/claude-review.yml` | automated PR review comment (`anthropics/claude-code-action`); same-repo PRs auto, fork PRs via maintainer `@claude` mention |
 | `.githooks/pre-push` | local guard: main is PR-only |
