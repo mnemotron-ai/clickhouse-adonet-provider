@@ -1,0 +1,44 @@
+# Live conformance replay on net48 under mono (issue #3). Separate from the
+# required gate (ci.yml): net48 is the provider's actual SSAS deployment
+# target, but running the full corpus through mono is new and still
+# stabilizing, hence continue-on-error below.
+name: net48-replay
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  replay-net48:
+    runs-on: ubuntu-latest
+    # Bring-up period — remove once stable (tracked in issue #3).
+    continue-on-error: true
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.3.14 # same pin as ci.yml/docker-compose.yml
+        env:
+          TZ: UTC
+          CLICKHOUSE_SKIP_USER_SETUP: "1"
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-interval 5s
+          --health-retries 30
+    env:
+      CH_URL: http://localhost:8123
+      CH_CONNECTION: Host=localhost;Port=8123;Protocol=http;Username=default
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 9.0.x
+      - name: Install mono
+        # mono was removed from the ubuntu-24.04 runner image; mono-complete
+        # (not mono-devel) is required because the provider uses System.Web/HttpUtility.
+        run: sudo apt-get update && sudo apt-get install -y mono-complete
+      - name: Replay corpus on net48 under mono
+        run: make replay-net48
+      - name: Compare net48 replay against golden
+        run: make conformance-net48
