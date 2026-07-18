@@ -1,19 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Конформанс-харнесс ai-fabric: golden (оракул по HTTP) | replay (наш
-       провайдер) | compare (структурный компаратор, политика policy.json).
-       net8-only: гоняется на macOS/linux CI; net48-путь провайдера кроется
-       unit-тестами на Windows (build-plan.md §Risks). -->
+  <!-- ai-fabric conformance harness: golden (HTTP oracle) | replay (our
+       provider) | compare (structural comparator, policy.json policy).
+       Dual-TFM: net8.0 runs on macOS/linux CI; net48 replays the provider's
+       .NET Framework path under mono on ubuntu (see .github/workflows/net48-replay.yml,
+       issue #3). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net48</TargetFrameworks>
     <RollForward>Major</RollForward>
     <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
     <AssemblyName>conformance-runner</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Mnemotron.Data.ClickHouse\Mnemotron.Data.ClickHouse.csproj" />
+  </ItemGroup>
+
+  <!-- Enables net48 cross-compile on linux/mac; does not flow transitively
+       from the src project reference. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
   </ItemGroup>
 
 </Project>

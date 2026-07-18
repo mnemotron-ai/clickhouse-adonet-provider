@@ -3,10 +3,10 @@
 # Reference ClickHouse: docker compose up -d (pinned version, port 18123).
 # CI overrides the endpoints via CH_URL / CH_CONNECTION / CLICKHOUSE_CONNECTION.
 
-RUNNER = dotnet run --project tools/Conformance.Runner -c Release --
+RUNNER = dotnet run --project tools/Conformance.Runner -c Release -f net8.0 --
 export CLICKHOUSE_CONNECTION ?= Host=localhost;Port=18123;Protocol=http;Username=default
 
-.PHONY: golden golden-schema fixture replay conformance lint test build ci hooks oracle-up self-parity
+.PHONY: golden golden-schema fixture replay conformance lint test build ci hooks oracle-up self-parity replay-net48 conformance-net48
 
 oracle-up:
 	docker compose up -d --wait
@@ -37,6 +37,17 @@ replay: fixture
 # Exit 0 = parity.
 conformance:
 	$(RUNNER) compare conformance/golden conformance/actual conformance/policy.json conformance/allowlist.txt
+
+# net48-under-mono leg (issue #3): replays the provider's .NET Framework
+# build path, not just net8.0. Bypasses $(RUNNER)/dotnet run (no net48 apphost
+# on linux/mac) and runs the built exe under mono directly.
+replay-net48: fixture
+	dotnet build tools/Conformance.Runner -c Release -f net48
+	mono tools/Conformance.Runner/bin/Release/net48/conformance-runner.exe replay conformance/corpus conformance/actual-net48
+
+# Same compare as `conformance`, against the net48 replay output.
+conformance-net48:
+	$(RUNNER) compare conformance/golden conformance/actual-net48 conformance/policy.json conformance/allowlist.txt
 
 # Comparator sanity check: golden vs golden must be 100% green
 # (no allowlist here — honest entries would show up as stale).
