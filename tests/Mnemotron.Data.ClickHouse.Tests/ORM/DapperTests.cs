@@ -146,7 +146,7 @@ public class DapperTests : AbstractConnectionTestFixture
         if (expected is DateTime dt)
             expected = dt.AddTicks(-dt.Ticks % TimeSpan.TicksPerSecond);
 
-        Assert.That(row.Single().Value, Is.EqualTo(expected).UsingPropertiesComparer());
+        TestUtilities.AssertSampleEquals(row.Single().Value, expected);
     }
 
     [Test]

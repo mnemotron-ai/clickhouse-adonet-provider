@@ -75,7 +75,7 @@ public class SqlParameterizedSelectTests : IDisposable
         command.AddParameter("var", clickHouseType, value);
 
         var result = (await command.ExecuteReaderAsync()).GetEnsureSingleRow().Single();
-        Assert.That(result, Is.EqualTo(value).UsingPropertiesComparer());
+        TestUtilities.AssertSampleEquals(result, value);
     }
 
     [Test]

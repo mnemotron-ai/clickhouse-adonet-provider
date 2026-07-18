@@ -283,4 +283,16 @@ public static class TestUtilities
     public static object[] GetFieldValues(this DbDataReader reader) => Enumerable.Range(0, reader.FieldCount).Select(reader.GetValue).ToArray();
 
     public static void AssertHasFieldCount(this DbDataReader reader, int expectedCount) => Assert.That(reader.FieldCount, Is.EqualTo(expectedCount));
+
+    // JSON object property order is not guaranteed across ClickHouse versions
+    // (26.x returns fields in a different order than 25.x), so JSON sample
+    // values are compared structurally instead of by ordered enumeration.
+    public static void AssertSampleEquals(object actual, object expected)
+    {
+        if (expected is JsonNode expectedNode && actual is JsonNode actualNode)
+            Assert.That(JsonNode.DeepEquals(actualNode, expectedNode), Is.True,
+                () => $"JSON values differ: expected {expectedNode.ToJsonString()}, got {actualNode.ToJsonString()}");
+        else
+            Assert.That(actual, Is.EqualTo(expected).UsingPropertiesComparer());
+    }
 }
