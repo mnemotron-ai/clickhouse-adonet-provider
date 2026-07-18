@@ -60,13 +60,13 @@ fail.
 
 | Component | Status |
 |---|---|
-| SSAS 2019 (Multidimensional + Tabular) | Exercised by the manual smoke checklist, `docs/ssas-smoke-checklist.md`. |
-| SSAS 2022 (Multidimensional + Tabular) | Exercised by the manual smoke checklist, `docs/ssas-smoke-checklist.md`. |
-| VS2022 + Analysis Services Projects extension | Exercised by the manual smoke checklist, `docs/ssas-smoke-checklist.md`. |
-| VS2019 + Analysis Services Projects extension | Documented in the cartridge path table (`docs/deploy-windows.md`, §5) — the design-time cartridge location is known and deployed to, but VS2019 is **not yet independently smoke-tested**. Known gap. |
-| SSIS / SSDT | Supported via the same VS/SSDT tooling path as SSAS Tabular; there is **no dedicated SSIS smoke checklist yet**. Known gap. |
+| SSIS 2022 (VS2022, ADO NET Source) | **Field-verified on real workloads** with the released provider (see `docs/deploy-windows.md` §8 for the string-sizing guidance that came out of it). No dedicated smoke checklist yet. |
+| SSAS 2022 (Multidimensional + Tabular) | Provider + cartridge install verified on a field host (GAC, machine.config factory lookup, live queries, `GetSchema`). The 4-item designer checklist in `docs/ssas-smoke-checklist.md` is **not yet executed** — tracked in issue #1. |
+| SSAS 2019 (Multidimensional + Tabular) | Intended target, documented; **not yet smoke-tested**. Known gap. |
+| VS2022 + Analysis Services Projects extension | Design-time cartridge deployed (`docs/deploy-windows.md` §5); designer checklist pending (issue #1). |
+| VS2019 + Analysis Services Projects extension | Cartridge locations documented and deployed to (`docs/deploy-windows.md` §5); **not yet independently smoke-tested**. Known gap. |
 
-The manual checklist (`docs/ssas-smoke-checklist.md`) is run before every
-release and its results are recorded there via a PR. It is the only version
-combination independently verified end-to-end; the two gaps above are called
-out honestly rather than implied by omission.
+The manual checklist (`docs/ssas-smoke-checklist.md`) is intended to run
+before every release, with results recorded there via a PR; it has not been
+executed yet (issue #1). The gaps above are called out honestly rather than
+implied by omission.
