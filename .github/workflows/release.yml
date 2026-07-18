@@ -41,6 +41,14 @@ jobs:
       - name: Publish installer (net48)
         run: dotnet publish tools/Installer -c Release -f net48 -o publish/installer /p:Version=${{ steps.ver.outputs.version }}
 
+      # Additive payload (issue #5): a single ILRepack-merged assembly next
+      # to the unmerged provider-net48/ folder. The default Setup.exe
+      # install still uses provider-net48/ unmerged — the merged payload is
+      # for field-testing via `Setup.exe --payload ...\provider-net48-merged`
+      # ahead of a later default-flip decision (issue #1 SSAS smoke).
+      - name: Merge provider into a single assembly (net48)
+        run: make merge-net48
+
       - name: Assemble release zip
         env:
           TAG: ${{ steps.ver.outputs.tag }}
@@ -48,11 +56,12 @@ jobs:
           set -euo pipefail
           NAME="Mnemotron.Data.ClickHouse-${TAG}-win-installer"
           STAGE="stage/${NAME}"
-          mkdir -p "$STAGE/provider-net48" "$STAGE/cartridge" "$STAGE/deploy"
+          mkdir -p "$STAGE/provider-net48" "$STAGE/provider-net48-merged" "$STAGE/cartridge" "$STAGE/deploy"
 
           cp publish/installer/Setup.exe "$STAGE/Setup.exe"
           cp publish/installer/Setup.exe "$STAGE/Uninstall.exe"
           cp -R publish/provider-net48/. "$STAGE/provider-net48/"
+          cp -R publish/provider-net48-merged/. "$STAGE/provider-net48-merged/"
           cp cartridge/clickhouse.xsl "$STAGE/cartridge/clickhouse.xsl"
           cp deploy/register-provider.ps1 deploy/install-cartridge.ps1 "$STAGE/deploy/"
           cp tools/Installer/INSTALL.md "$STAGE/INSTALL.md"

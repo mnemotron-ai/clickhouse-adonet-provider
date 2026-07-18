@@ -49,7 +49,8 @@ corpus/*.json ──make golden-schema──▶ GetSchema through the provider �
 | `deploy/install-cartridge.ps1` | deploys clickhouse.xsl to SSAS server + design-time cartridge folders, `-Uninstall` |
 | `cartridge/clickhouse.xsl` | draft XSL cartridge for SSAS MD; pending empirical verification (see file header) |
 | `docker-compose.yml` | pinned reference ClickHouse (port 18123) |
-| `Makefile` | gate contract: golden/golden-schema/fixture/replay/conformance/ci/hooks |
+| `Makefile` | gate contract: golden/golden-schema/fixture/replay/conformance/ci/hooks; `merge-net48` is release-time only (not in `ci`) |
+| `.config/dotnet-tools.json` | local tool manifest pinning `dotnet-ilrepack` 2.0.45, used by `make merge-net48` |
 | `.github/workflows/ci.yml` | CI gate: live replay vs a ClickHouse service container |
 | `.github/workflows/windows.yml` | Windows compile check (path-filtered) |
 | `.github/workflows/compat.yml` | scheduled/manual, non-blocking: unit test suite across the ClickHouse support matrix (24.8 .. latest); see `docs/support-matrix.md` |

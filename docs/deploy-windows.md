@@ -37,6 +37,16 @@ Uninstall.exe --keep-cartridge               # leave deployed cartridge copies i
 Setup.exe --help                             # full option list
 ```
 
+The release zip also ships `provider-net48-merged\` — a single ILRepack-merged
+`Mnemotron.Data.ClickHouse.dll` (same identity: `Version=1.0.0.0`, PublicKeyToken
+`1a9f1c23413d5b5e`) instead of the provider + 20 dependency DLLs. It is
+**not** the default payload yet (pending the SSAS smoke, issue #1) but can
+be field-tested with:
+
+```
+Setup.exe --payload C:\path\to\unzipped\provider-net48-merged
+```
+
 Verify from an elevated **Windows PowerShell 5.1** prompt:
 `[System.Data.Common.DbProviderFactories]::GetFactory('Mnemotron.Data.ClickHouse')`
 should return without error. Then restart the SSAS service (and Visual
@@ -131,9 +141,12 @@ Trade-off accepted: the closure includes very common assemblies
 (`System.Buffers`, `System.Memory`, `Microsoft.Extensions.*`). The GAC is
 side-by-side per version+token, so installing them cannot break other
 applications; the only cost is registry/disk clutter and the uninstall care
-described in §3. Collapsing the closure (ILMerge/ILRepack-style single-file
-provider) is deferred to a later milestone — it would shrink the GAC footprint
-to one assembly but needs internalization testing against SSAS.
+described in §3. Collapsing the closure is no longer deferred: `make
+merge-net48` (`dotnet-ilrepack`, `/internalize`, repo `.snk`) produces a
+single merged `Mnemotron.Data.ClickHouse.dll` with the same identity, and
+the release zip ships it additively as `provider-net48-merged\` (see §0).
+The *default* `Setup.exe` payload stays the unmerged folder until the
+default-flip decision, gated on the SSAS smoke (issue #1).
 
 ## 5. Cartridge locations (design time)
 

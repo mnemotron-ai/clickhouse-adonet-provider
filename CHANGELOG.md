@@ -40,6 +40,16 @@ versioning: [SemVer 2.0](https://semver.org/).
   `String` column's actual maximum length (one aggregate scan per schema read)
   for automatic tight SSIS buffers. Set `ProbeStringLengths=false` for very
   large tables where the per-schema-read scan is too costly.
+- Additive single-assembly net48 payload (`provider-net48-merged/`) in the
+  release zip: `make merge-net48` (`dotnet-ilrepack` 2.0.45, `/internalize`,
+  repo `.snk`) merges the provider + its 20 dependency DLLs into one
+  strong-named `Mnemotron.Data.ClickHouse.dll` (same identity,
+  `Version=1.0.0.0` / `PublicKeyToken=1a9f1c23413d5b5e`). Structurally
+  eliminates the host-bindingRedirect failure class for that payload — a
+  host redirecting `System.Text.Json` / `Microsoft.Extensions.*` cannot
+  affect the internalized copies inside the merged assembly. The default
+  `Setup.exe` payload is unchanged (still the unmerged folder); flipping it
+  is a separate decision pending the SSAS smoke (issue #1).
 
 ### Fixed
 - Decimal columns that fit `System.Decimal` (precision ≤ 28) are now returned
