@@ -119,9 +119,11 @@ public class GetSchemaTests : AbstractConnectionTestFixture
         var byCollection = table.Rows.Cast<DataRow>().ToLookup(r => (string)r["CollectionName"]);
         Assert.Multiple(() =>
         {
-            Assert.That(byCollection["Tables"].Count(), Is.EqualTo(2));
-            Assert.That(byCollection["Views"].Count(), Is.EqualTo(2));
-            Assert.That(byCollection["Columns"].Count(), Is.EqualTo(3));
+            // SqlClient shapes: Tables (Catalog, Owner, Table, TableType),
+            // Views (Catalog, Owner, Table), Columns (Catalog, Owner, Table, Column).
+            Assert.That(byCollection["Tables"].Count(), Is.EqualTo(4));
+            Assert.That(byCollection["Views"].Count(), Is.EqualTo(3));
+            Assert.That(byCollection["Columns"].Count(), Is.EqualTo(4));
         });
     }
 
@@ -143,7 +145,7 @@ public class GetSchemaTests : AbstractConnectionTestFixture
     [Test]
     public void TablesWithTableRestrictionShouldReturnSingleRow()
     {
-        var table = connection.GetSchema("Tables", [FixtureDatabase, "orders"]);
+        var table = connection.GetSchema("Tables", [FixtureDatabase, null, "orders"]);
         Assert.That(table.Rows, Has.Count.EqualTo(1));
         Assert.That(table.Rows[0]["TABLE_NAME"], Is.EqualTo("orders"));
     }
@@ -166,7 +168,7 @@ public class GetSchemaTests : AbstractConnectionTestFixture
     [Test]
     public void ColumnsShouldReturnStandardShapeWithHonestFacts()
     {
-        var table = connection.GetSchema("Columns", [FixtureDatabase, "orders"]);
+        var table = connection.GetSchema("Columns", [FixtureDatabase, null, "orders"]);
         Assert.That(ColumnNames(table), Is.EqualTo(new[]
         {
             "TABLE_CATALOG", "TABLE_SCHEMA", "TABLE_NAME", "COLUMN_NAME", "ORDINAL_POSITION", "COLUMN_DEFAULT",
@@ -189,7 +191,7 @@ public class GetSchemaTests : AbstractConnectionTestFixture
     [Test]
     public void ColumnsWithColumnRestrictionShouldReturnSingleColumn()
     {
-        var table = connection.GetSchema("Columns", [FixtureDatabase, "types_matrix", "fs"]);
+        var table = connection.GetSchema("Columns", [FixtureDatabase, null, "types_matrix", "fs"]);
         Assert.That(table.Rows, Has.Count.EqualTo(1));
         var row = table.Rows[0];
         Assert.Multiple(() =>
@@ -200,6 +202,31 @@ public class GetSchemaTests : AbstractConnectionTestFixture
     }
 
     [Test]
-    public void TooManyRestrictionsShouldThrow() =>
-        Assert.Throws<ArgumentException>(() => connection.GetSchema("Tables", [FixtureDatabase, "orders", "extra"]));
+    public void TableTypeRestrictionShouldFilter()
+    {
+        // SSDT's DSV wizard passes the 4-element SqlClient shape (Catalog, Owner, Table, TableType).
+        var tables = connection.GetSchema("Tables", [FixtureDatabase, null, null, "TABLE"]);
+        Assert.That(tables.Rows, Is.Not.Empty);
+        Assert.That(tables.Rows.Cast<DataRow>().Select(r => (string)r["TABLE_TYPE"]), Is.All.EqualTo("BASE TABLE"));
+        var views = connection.GetSchema("Tables", [FixtureDatabase, null, null, "VIEW"]);
+        Assert.That(views.Rows.Cast<DataRow>().Select(r => (string)r["TABLE_NAME"]), Is.EqualTo(new[] { "orders_view" }));
+    }
+
+    [Test]
+    public void OwnerRestrictionShouldActAsDatabaseFilter()
+    {
+        // ClickHouse has no catalog/schema split: Owner is a database filter too...
+        var table = connection.GetSchema("Tables", [null, FixtureDatabase, "orders"]);
+        Assert.That(table.Rows, Has.Count.EqualTo(1));
+        // ...so two different non-null databases at once match nothing.
+        Assert.That(connection.GetSchema("Tables", [FixtureDatabase, "somewhere_else"]).Rows, Is.Empty);
+    }
+
+    [Test]
+    public void ExtraRestrictionsShouldBeIgnoredNotThrown()
+    {
+        // SSDT swallows GetSchema exceptions and renders an empty tree — never throw on extras.
+        var table = connection.GetSchema("Tables", [FixtureDatabase, null, "orders", "BASE TABLE", "extra"]);
+        Assert.That(table.Rows, Has.Count.EqualTo(1));
+    }
 }
