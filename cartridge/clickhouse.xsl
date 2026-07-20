@@ -128,14 +128,21 @@
 	<!-- Design-time schema helper classes, keyed by the ADO.NET invariant
 	     name. Reusing the generic SqlSchema/SqlClientQueryDesigner classes
 	     is the pattern proven by the community Npgsql cartridge.
-	     TODO(ssas-smoke): verify the DSV wizard accepts these classes for
-	     a non-SqlClient provider. -->
+	     ssas-smoke finding (2026-07-20): the assembly here MUST be
+	     "Microsoft.DataWarehouse.AS" — that is its name in the VS2022 SSAS
+	     extension ("Microsoft.DataWarehouse" was the pre-VS2022 name, and
+	     Assembly.Load on it throws FileNotFound, which the DSV wizard
+	     swallows, rendering an EMPTY object tree with no error). Verified
+	     live: SqlSchema over this provider returns the renamed
+	     SchemaName/TableName/TableType shape the wizard expects.
+	     SqlClientQueryDesigner is internal in that assembly, so the graphic
+	     query designer may not instantiate — non-blocking for the DSV. -->
 	<mssqlcrt:schema-classes>
 		<mssqlcrt:schema-class>
 			<mssqlcrt:managed-provider>Mnemotron.Data.ClickHouse</mssqlcrt:managed-provider>
-			<mssqlcrt:type>Microsoft.DataWarehouse.Design.SqlSchema, Microsoft.DataWarehouse</mssqlcrt:type>
+			<mssqlcrt:type>Microsoft.DataWarehouse.Design.SqlSchema, Microsoft.DataWarehouse.AS</mssqlcrt:type>
 			<mssqlcrt:query-designer>
-				<mssqlcrt:type>Microsoft.DataWarehouse.Controls.SqlClientQueryDesigner, Microsoft.DataWarehouse</mssqlcrt:type>
+				<mssqlcrt:type>Microsoft.DataWarehouse.Controls.SqlClientQueryDesigner, Microsoft.DataWarehouse.AS</mssqlcrt:type>
 			</mssqlcrt:query-designer>
 		</mssqlcrt:schema-class>
 	</mssqlcrt:schema-classes>
