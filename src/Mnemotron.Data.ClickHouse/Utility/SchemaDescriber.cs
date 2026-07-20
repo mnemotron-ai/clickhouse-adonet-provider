@@ -57,7 +57,9 @@ internal static class SchemaDescriber
             row["ColumnName"] = reader.GetName(ordinal);
             row["ColumnOrdinal"] = ordinal;
             row["ColumnSize"] = columnSize;
-            row["DataType"] = chType is NullableType nt ? nt.UnderlyingType.FrameworkType : chType.FrameworkType;
+            // Via GetFieldType so Nothing reports object, not DBNull (which
+            // DataTable rejects as a column type).
+            row["DataType"] = reader.GetFieldType(ordinal);
             row["ProviderType"] = chType;
             row["IsLong"] = isLong;
             row["AllowDBNull"] = chType is NullableType;

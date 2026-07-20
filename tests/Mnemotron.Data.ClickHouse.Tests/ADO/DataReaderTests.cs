@@ -216,4 +216,56 @@ public class DataReaderTests : AbstractConnectionTestFixture
         Assert.That(rows, Is.EqualTo(Enumerable.Range(0, 100)).AsCollection);
         ClassicAssert.IsFalse(reader.Read());
     }
+
+    // CommandBehavior is a flags enum; SSDT's DSV wizard passes
+    // SchemaOnly | KeyInfo. Combined flags must still take the schema-only
+    // path (no data rows) — an exact-value switch used to stream the full table.
+    [Test]
+    public void SchemaOnlyCombinedWithKeyInfoShouldReturnNoRows()
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT number FROM system.numbers LIMIT 100";
+        using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
+        Assert.That(reader.FieldCount, Is.EqualTo(1));
+        ClassicAssert.IsFalse(reader.Read());
+    }
+
+    [Test]
+    public void SingleRowCombinedWithOtherFlagsShouldReturnOneRow()
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT number FROM system.numbers LIMIT 100";
+        using var reader = cmd.ExecuteReader(CommandBehavior.SingleRow | CommandBehavior.SequentialAccess);
+        ClassicAssert.IsTrue(reader.Read());
+        ClassicAssert.IsFalse(reader.Read());
+    }
+
+    // A literal NULL column has ClickHouse type Nullable(Nothing); its CLR
+    // mapping used to be DBNull, which DataTable rejects as a column type
+    // ("Invalid storage type: DBNull") — the SSDT DSV wizard hits this on
+    // views with "NULL AS x" columns. Must surface as object instead.
+    [Test]
+    public void NothingColumnShouldSurfaceAsObjectInSchema()
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT 1 AS id, NULL AS empty";
+        using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
+        Assert.That(reader.GetFieldType(1), Is.EqualTo(typeof(object)));
+        var table = new System.Data.DataTable();
+        table.Load(reader);
+        Assert.That(table.Columns[1].DataType, Is.EqualTo(typeof(object)));
+        Assert.That(table.Rows, Is.Empty);
+    }
+
+    [Test]
+    public void NothingColumnShouldLoadRowsIntoDataTable()
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT number, NULL AS empty FROM numbers(3)";
+        using var reader = cmd.ExecuteReader();
+        var table = new System.Data.DataTable();
+        table.Load(reader);
+        Assert.That(table.Rows, Has.Count.EqualTo(3));
+        Assert.That(table.Rows[0]["empty"], Is.EqualTo(System.DBNull.Value));
+    }
 }
