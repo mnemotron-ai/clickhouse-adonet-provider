@@ -5,6 +5,18 @@ versioning: [SemVer 2.0](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Breaking (GetSchema):** `Tables`/`Views`/`Columns` restriction arrays now
+  follow the SqlClient shapes SSDT's wizards actually pass — Tables
+  `(Catalog, Owner, Table, TableType)`, Views `(Catalog, Owner, Table)`,
+  Columns `(Catalog, Owner, Table, Column)`. Previously the shapes were
+  provider-specific `(Database, Table[, Column])` and any longer array threw
+  `ArgumentException`, which SSDT's DSV wizard swallows — rendering an empty
+  object tree (found in the first live SSAS smoke, 2026-07-20). `Catalog` and
+  `Owner` are both database filters (ClickHouse has no catalog/schema split);
+  `TableType` accepts `BASE TABLE`/`TABLE`/`VIEW`; restrictions beyond the
+  declared count are now ignored instead of throwing.
+
 ### Added
 - `Mnemotron.Data.ClickHouse.csproj` is now publish-ready as a NuGet package:
   `PackageReadmeFile` (`PACKAGE.md`, packed at the package root), `Copyright`,

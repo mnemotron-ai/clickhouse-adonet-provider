@@ -3,7 +3,9 @@
 // Collections", DbMetaDataCollectionNames/DbMetaDataColumnNames).
 // Tables/Views/Columns are served from system.tables / system.columns with
 // parameterized restrictions ({name:String} binding) — no string concatenation
-// of user-supplied values, ever.
+// of user-supplied values, ever. Restrictions follow the SqlClient shapes those
+// wizards actually pass: Tables (Catalog, Owner, Table, TableType),
+// Views (Catalog, Owner, Table), Columns (Catalog, Owner, Table, Column).
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -55,7 +57,9 @@ internal static class SchemaDescriber
             row["ColumnName"] = reader.GetName(ordinal);
             row["ColumnOrdinal"] = ordinal;
             row["ColumnSize"] = columnSize;
-            row["DataType"] = chType is NullableType nt ? nt.UnderlyingType.FrameworkType : chType.FrameworkType;
+            // Via GetFieldType so Nothing reports object, not DBNull (which
+            // DataTable rejects as a column type).
+            row["DataType"] = reader.GetFieldType(ordinal);
             row["ProviderType"] = chType;
             row["IsLong"] = isLong;
             row["AllowDBNull"] = chType is NullableType;
@@ -159,9 +163,9 @@ internal static class SchemaDescriber
         table.Rows.Add(DbMetaDataCollectionNames.DataSourceInformation, 0, 0);
         table.Rows.Add(DbMetaDataCollectionNames.DataTypes, 0, 0);
         table.Rows.Add(DbMetaDataCollectionNames.Restrictions, 0, 0);
-        table.Rows.Add("Tables", 2, 2);
-        table.Rows.Add("Views", 2, 2);
-        table.Rows.Add("Columns", 3, 3);
+        table.Rows.Add("Tables", 4, 2);
+        table.Rows.Add("Views", 3, 2);
+        table.Rows.Add("Columns", 4, 3);
         return table;
     }
 
@@ -359,13 +363,17 @@ internal static class SchemaDescriber
         table.Columns.Add("RestrictionDefault", typeof(string));
         table.Columns.Add("RestrictionNumber", typeof(int));
 
-        table.Rows.Add("Tables", "Database", "TABLE_CATALOG", 1);
-        table.Rows.Add("Tables", "Table", "TABLE_NAME", 2);
-        table.Rows.Add("Views", "Database", "TABLE_CATALOG", 1);
-        table.Rows.Add("Views", "Table", "TABLE_NAME", 2);
-        table.Rows.Add("Columns", "Database", "TABLE_CATALOG", 1);
-        table.Rows.Add("Columns", "Table", "TABLE_NAME", 2);
-        table.Rows.Add("Columns", "Column", "COLUMN_NAME", 3);
+        table.Rows.Add("Tables", "Catalog", "TABLE_CATALOG", 1);
+        table.Rows.Add("Tables", "Owner", "TABLE_SCHEMA", 2);
+        table.Rows.Add("Tables", "Table", "TABLE_NAME", 3);
+        table.Rows.Add("Tables", "TableType", "TABLE_TYPE", 4);
+        table.Rows.Add("Views", "Catalog", "TABLE_CATALOG", 1);
+        table.Rows.Add("Views", "Owner", "TABLE_SCHEMA", 2);
+        table.Rows.Add("Views", "Table", "TABLE_NAME", 3);
+        table.Rows.Add("Columns", "Catalog", "TABLE_CATALOG", 1);
+        table.Rows.Add("Columns", "Owner", "TABLE_SCHEMA", 2);
+        table.Rows.Add("Columns", "Table", "TABLE_NAME", 3);
+        table.Rows.Add("Columns", "Column", "COLUMN_NAME", 4);
         return table;
     }
 
@@ -378,10 +386,17 @@ internal static class SchemaDescriber
     private static string Restriction(string[] restrictions, int index) =>
         restrictions != null && restrictions.Length > index && !string.IsNullOrEmpty(restrictions[index]) ? restrictions[index] : null;
 
-    private static void CheckRestrictionCount(string[] restrictions, int max, string collection)
+    // SqlClient-shaped restrictions start with (Catalog, Owner, ...). ClickHouse
+    // has no catalog/schema split, so BOTH are database filters; two different
+    // non-null values can match nothing (false). Extra restrictions beyond the
+    // declared count are deliberately ignored, never a throw: SSDT's wizards
+    // swallow GetSchema exceptions and render an empty object tree.
+    private static bool TryResolveDatabase(string[] restrictions, out string database)
     {
-        if (restrictions != null && restrictions.Length > max)
-            throw new ArgumentException($"More restrictions were provided than the requested schema ('{collection}') supports.");
+        var catalog = Restriction(restrictions, 0);
+        var owner = Restriction(restrictions, 1);
+        database = catalog ?? owner;
+        return catalog == null || owner == null || catalog == owner;
     }
 
     private static ClickHouseCommand BuildSystemQuery(ClickHouseConnection connection, string select, string from,
@@ -410,29 +425,36 @@ internal static class SchemaDescriber
 
     private static DataTable DescribeTables(ClickHouseConnection connection, string[] restrictions)
     {
-        CheckRestrictionCount(restrictions, 2, "Tables");
         var table = new DataTable("Tables");
         table.Columns.Add("TABLE_CATALOG", typeof(string));
         table.Columns.Add("TABLE_SCHEMA", typeof(string));
         table.Columns.Add("TABLE_NAME", typeof(string));
         table.Columns.Add("TABLE_TYPE", typeof(string));
 
+        // Restriction 4 filters on the reported TABLE_TYPE. SqlClient's value is
+        // "BASE TABLE"; some consumers pass "TABLE" — both accepted.
+        var requestedType = Restriction(restrictions, 3);
+        var wantTables = requestedType == null || Is(requestedType, "BASE TABLE") || Is(requestedType, "TABLE");
+        var wantViews = requestedType == null || Is(requestedType, "VIEW");
+        if (!TryResolveDatabase(restrictions, out var databaseFilter) || !(wantTables || wantViews))
+            return table;
+
         using var command = BuildSystemQuery(connection, "SELECT database, name, engine", "system.tables",
-            [("database", Restriction(restrictions, 0)), ("name", Restriction(restrictions, 1))], null, "database, name");
+            [("database", databaseFilter), ("name", Restriction(restrictions, 2))], null, "database, name");
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
             var database = reader.GetString(0);
             var name = reader.GetString(1);
-            var engine = reader.GetString(2);
-            table.Rows.Add(database, database, name, IsViewEngine(engine) ? "VIEW" : "BASE TABLE");
+            var isView = IsViewEngine(reader.GetString(2));
+            if (isView ? wantViews : wantTables)
+                table.Rows.Add(database, database, name, isView ? "VIEW" : "BASE TABLE");
         }
         return table;
     }
 
     private static DataTable DescribeViews(ClickHouseConnection connection, string[] restrictions)
     {
-        CheckRestrictionCount(restrictions, 2, "Views");
         var table = new DataTable("Views");
         table.Columns.Add("TABLE_CATALOG", typeof(string));
         table.Columns.Add("TABLE_SCHEMA", typeof(string));
@@ -440,8 +462,11 @@ internal static class SchemaDescriber
         table.Columns.Add("CHECK_OPTION", typeof(string));
         table.Columns.Add("IS_UPDATABLE", typeof(string));
 
+        if (!TryResolveDatabase(restrictions, out var databaseFilter))
+            return table;
+
         using var command = BuildSystemQuery(connection, "SELECT database, name", "system.tables",
-            [("database", Restriction(restrictions, 0)), ("name", Restriction(restrictions, 1))],
+            [("database", databaseFilter), ("name", Restriction(restrictions, 2))],
             "engine LIKE '%View%'", "database, name");
         using var reader = command.ExecuteReader();
         while (reader.Read())
@@ -454,7 +479,6 @@ internal static class SchemaDescriber
 
     private static DataTable DescribeColumns(ClickHouseConnection connection, string[] restrictions)
     {
-        CheckRestrictionCount(restrictions, 3, "Columns");
         var table = new DataTable("Columns");
         table.Columns.Add("TABLE_CATALOG", typeof(string));
         table.Columns.Add("TABLE_SCHEMA", typeof(string));
@@ -469,10 +493,13 @@ internal static class SchemaDescriber
         table.Columns.Add("NUMERIC_SCALE", typeof(int));
         table.Columns.Add("DATETIME_PRECISION", typeof(int));
 
+        if (!TryResolveDatabase(restrictions, out var databaseFilter))
+            return table;
+
         using var command = BuildSystemQuery(connection,
             "SELECT database, table, name, type, position, default_expression, character_octet_length, numeric_precision, numeric_scale, datetime_precision",
             "system.columns",
-            [("database", Restriction(restrictions, 0)), ("table", Restriction(restrictions, 1)), ("name", Restriction(restrictions, 2))],
+            [("database", databaseFilter), ("table", Restriction(restrictions, 2)), ("name", Restriction(restrictions, 3))],
             null, "database, table, position");
         using var reader = command.ExecuteReader();
         while (reader.Read())

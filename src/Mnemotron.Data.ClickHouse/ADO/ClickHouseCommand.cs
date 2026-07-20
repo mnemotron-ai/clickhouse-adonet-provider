@@ -142,23 +142,21 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
 
         using var lcts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
         var sqlBuilder = new StringBuilder(CommandText);
-        switch (behavior)
-        {
-            case CommandBehavior.SingleRow:
-                sqlBuilder.Append(" LIMIT 1");
-                break;
-            case CommandBehavior.SchemaOnly:
-                sqlBuilder.Append(" LIMIT 0");
-                break;
-            default:
-                break;
-        }
+        // CommandBehavior is a flags enum: SSDT's DSV wizard passes
+        // SchemaOnly | KeyInfo, which a switch on the exact value silently
+        // treats as Default — streaming the FULL table into a schema read.
+        // Wrap in a subquery instead of appending: the command text may
+        // already end with its own LIMIT (a second LIMIT is a syntax error).
+        if (behavior.HasFlag(CommandBehavior.SchemaOnly))
+            sqlBuilder = new StringBuilder($"SELECT * FROM ({CommandText}) LIMIT 0");
+        else if (behavior.HasFlag(CommandBehavior.SingleRow))
+            sqlBuilder = new StringBuilder($"SELECT * FROM ({CommandText}) LIMIT 1");
         var result = await PostSqlQueryAsync(sqlBuilder.ToString(), lcts.Token).ConfigureAwait(false);
         var reader = ClickHouseDataReader.FromHttpResponse(result, connection.TypeSettings);
 
         // ProbeStringLengths: on a metadata read, replace the flat DefaultStringSize
         // with the actual maximum length of each String column (one aggregate scan).
-        if (behavior == CommandBehavior.SchemaOnly && connection.ProbeStringLengths)
+        if (behavior.HasFlag(CommandBehavior.SchemaOnly) && connection.ProbeStringLengths)
             reader.ProbedColumnSizes = await ProbeStringLengthsAsync(reader, lcts.Token).ConfigureAwait(false);
 
         return reader;

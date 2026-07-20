@@ -123,7 +123,11 @@ public class ClickHouseDataReader : DbDataReader, IEnumerator<IDataReader>, IEnu
     public override Type GetFieldType(int ordinal)
     {
         var rawType = RawTypes[ordinal];
-        return rawType is NullableType nt ? nt.UnderlyingType.FrameworkType : rawType.FrameworkType;
+        var type = rawType is NullableType nt ? nt.UnderlyingType.FrameworkType : rawType.FrameworkType;
+        // Nothing (a literal NULL column) maps to DBNull, which DataTable
+        // rejects as a column type ("Invalid storage type: DBNull") — report
+        // object so ADO.NET consumers can materialize the column.
+        return type == typeof(DBNull) ? typeof(object) : type;
     }
 
     public override float GetFloat(int ordinal) => (float)GetValue(ordinal);
