@@ -44,8 +44,9 @@ public class ClickHouseDataReader : DbDataReader, IEnumerator<IDataReader>, IEnu
         ExtendedBinaryReader reader = null;
         try
         {
-            var stream = new BufferedStream(httpResponse.Content.ReadAsStreamAsync().GetAwaiter().GetResult(), BufferSize);
-            reader = new ExtendedBinaryReader(stream); // will dispose of stream
+            // No BufferedStream layer: the reader buffers internally (BufferSize)
+            var stream = httpResponse.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+            reader = new ExtendedBinaryReader(stream, BufferSize); // will dispose of stream
             var (names, types, typeNames) = ReadHeaders(reader, settings);
             return new ClickHouseDataReader(httpResponse, reader, names, types, typeNames, settings);
         }
