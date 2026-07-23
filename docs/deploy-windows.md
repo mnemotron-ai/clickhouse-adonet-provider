@@ -239,3 +239,42 @@ very large tables:**
   `DT_WSTR` ceiling — no truncation, no LOB). Set `DefaultStringSize` to your
   known maximum for a no-scan middle ground (e.g. `DefaultStringSize=2000`), or
   `0`/`>4000` to force LOB semantics for genuinely huge text columns.
+
+## 9. Timeout and connection concurrency for heavy pulls
+
+**`Timeout` (connection string, default 2 minutes) is effectively a
+time-to-first-body-bytes limit.** Verified empirically against ClickHouse
+25.3.14 on both net8 and the .NET Framework build:
+
+- A query whose response body **is already streaming** is never cut by
+  `Timeout` — a 140-second dripping stream completed on the default 2 minutes
+  on both runtimes. This is why long multi-minute SSAS imports work.
+- A query that produces **no body bytes within `Timeout`** dies with
+  `TaskCanceledException` at exactly the deadline, zero rows delivered. Two
+  ways to get there in practice: a heavy aggregation (`GROUP BY` over billions
+  of rows) that computes for minutes before the first block, or a **small /
+  highly-compressible result that sits in the server's ~1 MB HTTP output
+  buffer** until the query finishes (with `Compression=true`, the default, a
+  well-compressing result can hide there far longer than intuition suggests).
+
+**Recommendation:** for cube processing / heavy extraction queries set
+`Timeout` explicitly with headroom over the slowest expected
+query-start-to-first-block time, e.g. `Timeout=1800` (seconds) for
+half-hour-class processing runs. `Timeout` only bounds the wait for the
+stream to start flowing, so a generous value does not risk hung imports —
+pair it with a server-side `max_execution_time` if runaway queries are a
+concern.
+
+**Connection concurrency (net4x):** the provider raises the shared HTTP
+handler's `MaxConnectionsPerServer` to 16 on .NET Framework (the legacy stack
+caps a client process at `ServicePointManager.DefaultConnectionLimit` —
+historically 2 — concurrent connections per host, which would serialize
+parallel SSIS dataflows against the same ClickHouse). .NET 8 has no such cap;
+nothing changes there.
+
+**Compression on fast networks:** `Compression=true` (the default) trades CPU
+for bandwidth. On a fast LAN between the SSIS/SSAS host and ClickHouse the
+gzip deflate/inflate CPU is the bottleneck, not the wire: in the project
+bench disabling it (`Compression=false`) roughly doubled wide-row throughput
+on localhost. Keep compression for WAN/slow links; consider disabling it when
+the hosts share a datacenter switch.
