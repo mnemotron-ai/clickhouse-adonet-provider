@@ -59,6 +59,20 @@ public class ClickHouseConnectionStringBuilder : DbConnectionStringBuilder
         set => this["ProbeStringLengths"] = value;
     }
 
+    /// <summary>
+    /// Gets or sets for how long (seconds) a ProbeStringLengths result is reused
+    /// for the same connection string + command text before re-scanning.
+    /// SSIS/SSDT re-trigger schema reads on every package validation; the cache
+    /// collapses those repeated full scans. Staleness is low-risk: probed sizes
+    /// are already rounded up to the next multiple of 64 for headroom. 0 disables
+    /// the cache (probe on every schema read). Default: 300.
+    /// </summary>
+    public int ProbeStringLengthsCacheTtl
+    {
+        get => GetIntOrDefault("ProbeStringLengthsCacheTtl", 300);
+        set => this["ProbeStringLengthsCacheTtl"] = value;
+    }
+
     public string Protocol
     {
         get => GetStringOrDefault("Protocol", "http");

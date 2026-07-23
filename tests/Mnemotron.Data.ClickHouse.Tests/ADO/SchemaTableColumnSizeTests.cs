@@ -90,6 +90,43 @@ public class SchemaTableColumnSizeTests : AbstractConnectionTestFixture
         Assert.That(schema.Rows[0]["ColumnSize"], Is.EqualTo(64));
     }
 
+    // Within ProbeStringLengthsCacheTtl a repeated SchemaOnly read reuses the
+    // probed sizes (no re-scan → stale size served); TTL=0 probes every time.
+    [Test]
+    public async Task ShouldCacheProbeWithinTtlAndBypassWithTtlZero()
+    {
+        var table = "probe_cache_test";
+        await connection.ExecuteStatementAsync($"DROP TABLE IF EXISTS {table}");
+        await connection.ExecuteStatementAsync($"CREATE TABLE {table} (value String) ENGINE Memory");
+        await connection.ExecuteStatementAsync($"INSERT INTO {table} VALUES ('{new string('a', 30)}')"); // 30 → 64
+
+        var builder = TestUtilities.GetConnectionStringBuilder();
+        builder.ProbeStringLengths = true;
+        builder.ProbeStringLengthsCacheTtl = 600;
+        using var cn = new ClickHouseConnection(builder.ConnectionString);
+        await cn.OpenAsync();
+        Assert.That(await ProbedSize(cn, table), Is.EqualTo(64));
+
+        await connection.ExecuteStatementAsync($"INSERT INTO {table} VALUES ('{new string('b', 100)}')"); // 100 → 128
+
+        Assert.That(await ProbedSize(cn, table), Is.EqualTo(64), "within TTL the cached size is served");
+
+        builder.ProbeStringLengthsCacheTtl = 0;
+        using var fresh = new ClickHouseConnection(builder.ConnectionString);
+        await fresh.OpenAsync();
+        Assert.That(await ProbedSize(fresh, table), Is.EqualTo(128), "TTL=0 probes every time");
+    }
+
+    private static async Task<object> ProbedSize(ClickHouseConnection cn, string table)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = $"SELECT value FROM {table}";
+        using var reader = cmd.ExecuteReader(System.Data.CommandBehavior.SchemaOnly);
+        var schema = reader.GetSchemaTable();
+        await Task.CompletedTask;
+        return schema.Rows[0]["ColumnSize"];
+    }
+
     // An all-NULL / empty String probe falls back to DefaultStringSize.
     [Test]
     public async Task ShouldFallBackWhenProbeIsEmpty()

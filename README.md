@@ -37,7 +37,10 @@ settings control this:
   column's actual maximum length (with headroom) instead of the flat
   `DefaultStringSize` — automatic tight buffers, no manual tuning. The probe is
   a full scan: cheap for import-sized tables, expensive for very large ones —
-  set `ProbeStringLengths=false` (and tune `DefaultStringSize`) for those. Note
+  set `ProbeStringLengths=false` (and tune `DefaultStringSize`) for those.
+  Repeated schema reads for the same query reuse the probe result for
+  `ProbeStringLengthsCacheTtl` seconds (default `300`, `0` = probe every
+  time), so SSIS package validations don't re-scan on every run. Note
   that probed widths reflect current data, so a package's frozen metadata can
   truncate if a column later grows; re-refresh the source metadata after
   significant data growth, or disable probing.

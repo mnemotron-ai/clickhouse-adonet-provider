@@ -225,6 +225,11 @@ very large tables:**
 - **Cost:** the probe is a **full aggregate scan** of the query, run at design
   time *and* at every runtime validation. Milliseconds for import-sized tables;
   a heavy, repeated scan for tables of hundreds of millions / billions of rows.
+  Repeated validations within `ProbeStringLengthsCacheTtl` seconds (default 300)
+  reuse the previous result instead of re-scanning — one scan per editing/run
+  burst, not one per validation. `ProbeStringLengthsCacheTtl=0` restores
+  probe-every-time. Staleness inside the TTL window is bounded by the round-up
+  headroom already applied to probed widths.
 - **Truncation:** probed widths reflect the data *at probe time*. If a column
   later gains longer values, the width frozen in the SSIS package can truncate
   (SSIS fails or loses data). Re-refresh the source metadata after significant
