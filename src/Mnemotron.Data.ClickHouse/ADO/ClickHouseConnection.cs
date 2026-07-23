@@ -59,6 +59,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
     private bool useCustomDecimals;
     private int defaultStringSize = TypeSettings.DefaultStringColumnSize;
     private bool probeStringLengths = true;
+    private int probeStringLengthsCacheTtl = 300;
     private TimeSpan timeout;
     private Uri serverUri;
     private Feature supportedFeatures;
@@ -368,6 +369,8 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
 
     internal bool ProbeStringLengths => probeStringLengths;
 
+    internal int ProbeStringLengthsCacheTtlSeconds => probeStringLengthsCacheTtl;
+
     internal TypeSettings TypeSettings
     {
         get
@@ -451,6 +454,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
                 UseCustomDecimals = useCustomDecimals,
                 DefaultStringSize = defaultStringSize,
                 ProbeStringLengths = probeStringLengths,
+                ProbeStringLengthsCacheTtl = probeStringLengthsCacheTtl,
             };
 
             foreach (var kvp in CustomSettings)
@@ -473,6 +477,7 @@ public class ClickHouseConnection : DbConnection, IClickHouseConnection, IClonea
             useCustomDecimals = builder.UseCustomDecimals;
             defaultStringSize = builder.DefaultStringSize;
             probeStringLengths = builder.ProbeStringLengths;
+            probeStringLengthsCacheTtl = builder.ProbeStringLengthsCacheTtl;
 
             foreach (var key in builder.Keys.Cast<string>().Where(k => k.StartsWith(CustomSettingPrefix, true, CultureInfo.InvariantCulture)))
             {

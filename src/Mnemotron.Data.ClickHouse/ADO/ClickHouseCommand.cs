@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -162,12 +163,26 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
         return reader;
     }
 
+    // Probe results reused across commands: SSIS/SSDT re-trigger SchemaOnly reads
+    // (and therefore the full aggregate scan below) on every package validation.
+    // Keyed by (connection string, command text); TTL from
+    // ProbeStringLengthsCacheTtl (0 = off). Staleness is bounded by the
+    // round-up-to-64 headroom SchemaDescriber applies to probed sizes.
+    // ponytail: crude wholesale clear past 1000 entries; per-entry eviction if
+    // dynamic query churn ever matters.
+    private static readonly ConcurrentDictionary<(string ConnectionString, string CommandText), (int[] Sizes, DateTime At)> ProbeCache = new();
+
     // Runs SELECT max(lengthUTF8(col)) over the original query for its String
     // columns (FixedString has a fixed declared length and is skipped; other
     // types report -1). lengthUTF8 = character count, matching DT_WSTR length;
     // ClickHouse max() ignores NULLs. Returns a per-ordinal size array or null.
     private async Task<int[]> ProbeStringLengthsAsync(ClickHouseDataReader reader, CancellationToken token)
     {
+        var ttl = connection.ProbeStringLengthsCacheTtlSeconds;
+        var cacheKey = (connection.ConnectionString, CommandText);
+        if (ttl > 0 && ProbeCache.TryGetValue(cacheKey, out var cached) && (DateTime.UtcNow - cached.At).TotalSeconds < ttl)
+            return cached.Sizes;
+
         var sizes = new int[reader.FieldCount];
         var projections = new List<string>();
         var ordinals = new List<int>();
@@ -197,6 +212,13 @@ public class ClickHouseCommand : DbCommand, IClickHouseCommand, IDisposable
         {
             for (var j = 0; j < ordinals.Count; j++)
                 sizes[ordinals[j]] = probeReader.IsDBNull(j) ? 0 : (int)Math.Min(int.MaxValue, Convert.ToInt64(probeReader.GetValue(j), CultureInfo.InvariantCulture));
+        }
+
+        if (ttl > 0)
+        {
+            if (ProbeCache.Count > 1000)
+                ProbeCache.Clear();
+            ProbeCache[cacheKey] = (sizes, DateTime.UtcNow);
         }
 
         return sizes;
