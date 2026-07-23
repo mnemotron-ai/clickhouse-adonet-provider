@@ -6,6 +6,21 @@ versioning: [SemVer 2.0](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **Read-path performance overhaul** (wide-row throughput on the .NET
+  Framework leg ~3× in the project bench, 342k → ~1M rows/s; net8 was already
+  near the wire ceiling): `ExtendedBinaryReader` rewritten as a standalone
+  single-buffer reader (drops the `BufferedStream` + `PeekableStreamWrapper` +
+  `BinaryReader` stack that cost two stream calls per primitive and 128-byte
+  string chunking); UUID reads are two register-width reads (was 14× slower
+  than any other type on net48); Enum lookups use a reverse index instead of a
+  per-row LINQ scan; `Decimal(P≤28)` values construct `System.Decimal`
+  directly from (mantissa, scale) — no division, no `BigInteger` for the
+  16-byte format; DateTime/DateTime64 take an epoch-arithmetic fast path for
+  UTC columns (NodaTime remains for real timezones); FixedString decodes
+  straight from the reader buffer.
+- net4x only: the shared HTTP handler now sets `MaxConnectionsPerServer=16`
+  (the legacy default of 2 concurrent connections per host serialized
+  parallel SSIS dataflows). net8 is unchanged (no cap there).
 - **Breaking (GetSchema):** `Tables`/`Views`/`Columns` restriction arrays now
   follow the SqlClient shapes SSDT's wizards actually pass — Tables
   `(Catalog, Owner, Table, TableType)`, Views `(Catalog, Owner, Table)`,
@@ -18,6 +33,21 @@ versioning: [SemVer 2.0](https://semver.org/).
   declared count are now ignored instead of throwing.
 
 ### Added
+- `ProbeStringLengthsCacheTtl` connection-string setting (seconds, default
+  300, `0` = off): ProbeStringLengths results are reused across repeated
+  schema reads of the same query, so SSIS package validations stop re-running
+  the full `max(lengthUTF8(...))` scan every time.
+- `bench` command in the conformance runner (`make bench`): provider-vs-raw
+  throughput matrix and per-type isolation benches against materialized
+  tables; the measurement harness behind the numbers above. Not part of `ci`.
+- Documented `Timeout` semantics for heavy pulls (`docs/deploy-windows.md`
+  §9, verified empirically): the default 2 minutes only bounds time to first
+  body bytes — an already-streaming response is never cut; a heavy
+  aggregation (or a compressible result parked in the server's HTTP buffer)
+  that produces nothing for 2 minutes dies with zero rows. Recommendation:
+  explicit `Timeout=1800` for processing-class queries. Also noted:
+  `Compression=false` can roughly double throughput on fast LANs (gzip is a
+  win only over slow links).
 - `Mnemotron.Data.ClickHouse.csproj` is now publish-ready as a NuGet package:
   `PackageReadmeFile` (`PACKAGE.md`, packed at the package root), `Copyright`,
   `RepositoryType=git`, and deterministic builds (`Deterministic=true`,

@@ -271,3 +271,10 @@ caps a client process at `ServicePointManager.DefaultConnectionLimit` —
 historically 2 — concurrent connections per host, which would serialize
 parallel SSIS dataflows against the same ClickHouse). .NET 8 has no such cap;
 nothing changes there.
+
+**Compression on fast networks:** `Compression=true` (the default) trades CPU
+for bandwidth. On a fast LAN between the SSIS/SSAS host and ClickHouse the
+gzip deflate/inflate CPU is the bottleneck, not the wire: in the project
+bench disabling it (`Compression=false`) roughly doubled wide-row throughput
+on localhost. Keep compression for WAN/slow links; consider disabling it when
+the hosts share a datacenter switch.
