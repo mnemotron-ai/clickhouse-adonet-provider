@@ -10,16 +10,19 @@ internal class UuidType : ClickHouseType
     public override object Read(ExtendedBinaryReader reader)
     {
         // Byte manipulation because of ClickHouse's weird GUID/UUID implementation.
-        // One 16-byte read instead of four positional ones (the four separate
-        // reader.Read calls dominated the whole wide-row bench on the net48 leg),
-        // then assemble the Guid fields straight from wire order:
-        // wire w0..w15 → Guid(a: w4..w7 LE, b: w2..w3 LE, c: w0..w1 LE, d..k: w15..w8).
-        var b = reader.ReadBytes(16);
+        // Two register-width reads, zero arrays (the four positional reader.Read
+        // calls this replaces dominated the whole wide-row bench on the net48 leg).
+        // Wire w0..w15 → Guid(a: w4..w7 LE, b: w2..w3 LE, c: w0..w1 LE, d..k: w15..w8);
+        // little-endian ReadUInt64 makes a = high half of the first quad, and
+        // d..k = the second quad's bytes from most to least significant.
+        var q1 = reader.ReadUInt64();
+        var q2 = reader.ReadUInt64();
         return new Guid(
-            b[4] | b[5] << 8 | b[6] << 16 | b[7] << 24,
-            (short)(b[2] | b[3] << 8),
-            (short)(b[0] | b[1] << 8),
-            b[15], b[14], b[13], b[12], b[11], b[10], b[9], b[8]);
+            unchecked((int)(q1 >> 32)),
+            unchecked((short)(q1 >> 16)),
+            unchecked((short)q1),
+            (byte)(q2 >> 56), (byte)(q2 >> 48), (byte)(q2 >> 40), (byte)(q2 >> 32),
+            (byte)(q2 >> 24), (byte)(q2 >> 16), (byte)(q2 >> 8), (byte)q2);
     }
 
     public override string ToString() => "UUID";
