@@ -39,7 +39,20 @@ internal abstract class AbstractDateTimeType : ParameterizedType
 
     public override Type FrameworkType => typeof(DateTime);
 
-    public DateTimeZone TimeZone { get; set; }
+    private DateTimeZone timeZone;
+    private bool timeZoneIsUtc = true;
+
+    public DateTimeZone TimeZone
+    {
+        get => timeZone;
+        set
+        {
+            timeZone = value;
+            // Servers commonly run in UTC (the Parse fallback resolves settings.timezone),
+            // so the per-row NodaTime InZone conversion is skippable in the common case.
+            timeZoneIsUtc = value == null || value == DateTimeZone.Utc || value.Id == "UTC";
+        }
+    }
 
     public DateTimeZone TimeZoneOrUtc => TimeZone ?? DateTimeZone.Utc;
 
@@ -49,6 +62,11 @@ internal abstract class AbstractDateTimeType : ParameterizedType
 
     public DateTime ToDateTime(Instant instant)
     {
+        // UTC fast path: epoch + ticks, Kind=Utc — identical to ToDateTimeUtc()
+        // for a zero-offset zone, without building the NodaTime calendar graph per row.
+        if (timeZoneIsUtc)
+            return DateTimeConversions.DateTimeEpochStart.AddTicks(instant.ToUnixTimeTicks());
+
         var zonedDateTime = instant.InZone(TimeZoneOrUtc);
         if (zonedDateTime.Offset.Ticks == 0)
             return zonedDateTime.ToDateTimeUtc();

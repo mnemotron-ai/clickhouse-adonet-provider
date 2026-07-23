@@ -6,7 +6,7 @@
 RUNNER = dotnet run --project tools/Conformance.Runner -c Release -f net8.0 --
 export CLICKHOUSE_CONNECTION ?= Host=localhost;Port=18123;Protocol=http;Username=default
 
-.PHONY: golden golden-schema fixture replay conformance lint test build ci hooks oracle-up self-parity replay-net48 conformance-net48 merge-net48
+.PHONY: golden golden-schema fixture replay conformance lint test build ci hooks oracle-up self-parity replay-net48 conformance-net48 merge-net48 bench
 
 oracle-up:
 	docker compose up -d --wait
@@ -69,6 +69,11 @@ ci: lint build test replay conformance
 
 hooks:
 	git config core.hooksPath .githooks
+
+# Manual throughput bench (NOT in ci): provider vs raw-HTTP ceiling, compression axis.
+# BENCH_ARGS e.g. "provider 5000000 nocompress"; default = full matrix on 2M rows.
+bench:
+	$(RUNNER) bench $(BENCH_ARGS)
 
 # Release-time only (issue #5): merge the published net48 provider +
 # dependency closure into one strong-named assembly via ILRepack, for the

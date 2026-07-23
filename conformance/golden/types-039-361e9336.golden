@@ -1,0 +1,9 @@
+e8	e16
+Enum8(\'lo\' = 0, \'mid\' = 1, \'hi\' = 2)	Enum16(\'a\' = 0, \'b\' = 1)
+lo	a
+mid	b
+hi	a
+lo	b
+mid	a
+hi	b
+lo	a

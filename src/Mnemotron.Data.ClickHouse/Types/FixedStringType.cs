@@ -24,7 +24,14 @@ internal class FixedStringType : ParameterizedType
 
     public override string ToString() => $"FixedString({Length})";
 
-    public override object Read(ExtendedBinaryReader reader) => Encoding.UTF8.GetString(reader.ReadBytes(Length));
+    public override object Read(ExtendedBinaryReader reader)
+    {
+        // Reader-owned scratch instead of ArrayPool: pool Rent/Return per value
+        // measurably regressed the net48 leg (mono bench), a reused buffer wins on both.
+        var buffer = reader.Scratch(Length);
+        reader.Read(buffer, 0, Length);
+        return Encoding.UTF8.GetString(buffer, 0, Length);
+    }
 
     public override void Write(ExtendedBinaryWriter writer, object value)
     {

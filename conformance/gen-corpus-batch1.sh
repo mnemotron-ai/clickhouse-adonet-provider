@@ -73,4 +73,13 @@ emit types "SELECT map('k1', 1, 'k2', 2) AS m"
 emit types "SELECT tuple(1, 'x') AS t"
 emit types "SELECT arrayJoin([toNullable(1), NULL, toNullable(3)]) AS v"
 
+# --- types: multi-row adjacency (perf workstream, Этап 1) — back-to-back values
+# through the same column readers: catches buffer-reuse/pooling bleed that
+# single-value cases cannot (Enum reverse lookup, pooled FixedString, direct
+# Decimal construction, single-read UUID).
+emit types "SELECT CAST(number % 3 AS Enum8('lo' = 0, 'mid' = 1, 'hi' = 2)) AS e8, CAST(number % 2 AS Enum16('a' = 0, 'b' = 1)) AS e16 FROM numbers(7) ORDER BY number"
+emit types "SELECT toFixedString(concat('fs', toString(number)), 8) AS f, toString(number * 100) AS s FROM numbers(7) ORDER BY number"
+emit types "SELECT toDecimal32(number * 0.1, 3) AS d32, toDecimal64(number * 1.5 - 3, 4) AS d64, toDecimal128(number * 1000000.000001 - 2000000, 10) AS d128 FROM numbers(7) ORDER BY number"
+emit types "SELECT toUUID(concat('0000000', toString(number), '-1234-5678-9abc-def012345678')) AS u FROM numbers(3) ORDER BY number"
+
 echo "corpus: $(ls *.sql | wc -l | tr -d ' ') cases"

@@ -84,16 +84,56 @@ internal class DecimalType : ParameterizedType
             };
             return new ClickHouseDecimal(mantissa, Scale);
         }
-        else
+
+        // This branch means Precision <= 28 (or UseCustomDecimals=false), so for
+        // Size <= 16 the value fits System.Decimal's 96-bit mantissa and Scale <= 28:
+        // construct (mantissa, scale) directly — no division, no BigInteger, no
+        // per-row (decimal)Exponent conversion. Bench: dec128 was 112B/row of
+        // BigInteger churn on this exact path.
+        switch (Size)
         {
-            var mantissa = Size switch
-            {
-                4 => reader.ReadInt32(),
-                8 => reader.ReadInt64(),
-                _ => (decimal)new BigInteger(reader.ReadBytes(Size)),
-            };
-            return mantissa / (decimal)Exponent;
+            case 4:
+                return FromMantissa(reader.ReadInt32());
+            case 8:
+                return FromMantissa(reader.ReadInt64());
+            case 16:
+                {
+                    var lo = reader.ReadUInt64();
+                    var hi = reader.ReadUInt64();
+                    var neg = hi >> 63 != 0;
+                    var alo = lo;
+                    var ahi = hi;
+                    if (neg)
+                    {
+                        alo = ~alo + 1;
+                        ahi = ~ahi + (alo == 0 ? 1UL : 0UL);
+                    }
+                    if (ahi == 0 && alo <= long.MaxValue)
+                        return FromMantissa(neg ? -(long)alo : (long)alo);
+                    // |mantissa| beyond 63 bits (values > ~9.2e18/10^Scale): rare — keep
+                    // the old BigInteger semantics verbatim, including its overflow behavior
+                    var big = (new BigInteger(unchecked((long)hi)) << 64) + lo;
+                    return (decimal)big / (decimal)Exponent;
+                }
+            default: // Size 32 with UseCustomDecimals=false: rare config, keep the old path
+                     // (including its OverflowException for Scale > 28 via (decimal)Exponent)
+                return (decimal)new BigInteger(reader.ReadBytes(Size)) / (decimal)Exponent;
         }
+    }
+
+    private decimal FromMantissa(long mantissa)
+    {
+        // Trim trailing zeros so ToString matches both the old division path and the
+        // server's own text rendering ("123.45", not "123.450"); usually 1 modulo.
+        var s = Scale;
+        while (s > 0 && mantissa % 10 == 0)
+        {
+            mantissa /= 10;
+            s--;
+        }
+        var neg = mantissa < 0;
+        var u = unchecked((ulong)(neg ? -mantissa : mantissa)); // long.MinValue wraps to its own |value|
+        return new decimal(unchecked((int)u), unchecked((int)(u >> 32)), 0, neg, (byte)s);
     }
 
     public override string ToString() => $"{Name}({Precision}, {Scale})";

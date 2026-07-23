@@ -25,7 +25,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-internal static class Program
+internal static partial class Program
 {
     private static string ChUrl => Environment.GetEnvironmentVariable("CH_URL") ?? "http://localhost:18123";
     private static string ChConnection => Environment.GetEnvironmentVariable("CH_CONNECTION")
@@ -41,13 +41,14 @@ internal static class Program
             case "replay": return await Replay(args[1], args[2]);
             case "compare": return Compare(args[1], args[2], args[3], args.Length > 4 ? args[4] : null);
             case "fixture": return await Fixture(args[1]);
+            case "bench": return await Bench(args);
             default: return Usage();
         }
     }
 
     private static int Usage()
     {
-        Console.Error.WriteLine("usage: conformance-runner golden <corpus> <goldenDir> | golden-schema <corpus> <goldenDir> | replay <corpus> <actualDir> | compare <goldenDir> <actualDir> <policy.json> [allowlist.txt] | fixture <file.sql>");
+        Console.Error.WriteLine("usage: conformance-runner golden <corpus> <goldenDir> | golden-schema <corpus> <goldenDir> | replay <corpus> <actualDir> | compare <goldenDir> <actualDir> <policy.json> [allowlist.txt] | fixture <file.sql> | bench [provider|raw|matrix|types] [rows] [compress|nocompress]");
         return 2;
     }
 

@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Text;
 
 namespace Mnemotron.Data.ClickHouse.Formats;
@@ -54,4 +55,14 @@ internal class ExtendedBinaryReader : BinaryReader
     }
 
     public override int PeekChar() => streamWrapper.Peek();
+
+    private byte[] scratch;
+
+    /// <summary>
+    /// Reusable grow-only scratch buffer for transient per-value reads
+    /// (e.g. FixedString decode). The reader is single-threaded by the
+    /// DbDataReader contract; callers must not hold on to the array.
+    /// </summary>
+    public byte[] Scratch(int count) =>
+        scratch != null && scratch.Length >= count ? scratch : scratch = new byte[Math.Max(count, 64)];
 }

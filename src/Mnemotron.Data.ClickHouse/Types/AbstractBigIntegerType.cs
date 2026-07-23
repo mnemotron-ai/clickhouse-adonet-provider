@@ -17,9 +17,8 @@ internal abstract class AbstractBigIntegerType : IntegerType
             return new BigInteger(reader.ReadBytes(Size));
 
         var data = new byte[Size + 1];
-        for (int i = 0; i < Size; i++)
-            data[i] = reader.ReadByte();
-        data[Size] = 0;
+        reader.Read(data, 0, Size);
+        // data[Size] stays 0: the extra zero byte keeps the BigInteger non-negative
         return new BigInteger(data);
     }
 
