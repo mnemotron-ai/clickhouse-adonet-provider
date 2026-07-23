@@ -93,7 +93,8 @@ FROM numbers({N})";
             ("str_wide", "repeat(toString(number % 1000), 20)"),
             ("fixstr16", "toFixedString(leftPad(toString(number % 100000), 16, ' '), 16)"),
             ("dec64", "toDecimal64(number % 1000000, 4)"),
-            ("dec128", "toDecimal128(number % 1000000, 10)"),
+            ("dec128", "toDecimal128(number % 1000000, 10)"), // P=38 → ClickHouseDecimal (BigDecimal) path
+            ("dec20_4", "CAST((number % 1000000) / 7 AS Decimal(20, 4))"), // P=20 → System.Decimal 128-bit path
             ("dt", "toDateTime(1700000000 + number % 86400)"),
             ("dt64", "toDateTime64(1700000000 + number % 86400, 3)"),
             ("nullable_i32", "if(number % 10 = 0, NULL, toInt32(number % 1000))"),
