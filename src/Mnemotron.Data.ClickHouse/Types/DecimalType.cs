@@ -97,24 +97,24 @@ internal class DecimalType : ParameterizedType
             case 8:
                 return FromMantissa(reader.ReadInt64());
             case 16:
-            {
-                var lo = reader.ReadUInt64();
-                var hi = reader.ReadUInt64();
-                var neg = hi >> 63 != 0;
-                var alo = lo;
-                var ahi = hi;
-                if (neg)
                 {
-                    alo = ~alo + 1;
-                    ahi = ~ahi + (alo == 0 ? 1UL : 0UL);
+                    var lo = reader.ReadUInt64();
+                    var hi = reader.ReadUInt64();
+                    var neg = hi >> 63 != 0;
+                    var alo = lo;
+                    var ahi = hi;
+                    if (neg)
+                    {
+                        alo = ~alo + 1;
+                        ahi = ~ahi + (alo == 0 ? 1UL : 0UL);
+                    }
+                    if (ahi == 0 && alo <= long.MaxValue)
+                        return FromMantissa(neg ? -(long)alo : (long)alo);
+                    // |mantissa| beyond 63 bits (values > ~9.2e18/10^Scale): rare — keep
+                    // the old BigInteger semantics verbatim, including its overflow behavior
+                    var big = (new BigInteger(unchecked((long)hi)) << 64) + lo;
+                    return (decimal)big / (decimal)Exponent;
                 }
-                if (ahi == 0 && alo <= long.MaxValue)
-                    return FromMantissa(neg ? -(long)alo : (long)alo);
-                // |mantissa| beyond 63 bits (values > ~9.2e18/10^Scale): rare — keep
-                // the old BigInteger semantics verbatim, including its overflow behavior
-                var big = (new BigInteger(unchecked((long)hi)) << 64) + lo;
-                return (decimal)big / (decimal)Exponent;
-            }
             default: // Size 32 with UseCustomDecimals=false: rare config, keep the old path
                      // (including its OverflowException for Scale > 28 via (decimal)Exponent)
                 return (decimal)new BigInteger(reader.ReadBytes(Size)) / (decimal)Exponent;
