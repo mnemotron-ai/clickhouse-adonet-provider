@@ -1,0 +1,36 @@
+# "Antivirus" for pull requests: scans the restored dependency tree (direct +
+# transitive, all TFMs) against the GitHub Advisory Database via the built-in
+# NuGet audit, and fails the PR if any package has a known vulnerability. This
+# is the vetting dependabot never does — it proposes bumps, this checks what
+# they (and everything already here) pull in. Uses `dotnet list --vulnerable`
+# rather than GitHub's dependency-review-action, which requires the repo
+# Dependency Graph feature (off at the org level here).
+name: security-scan
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  vulnerable-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 9.0.x
+      - name: Scan for vulnerable NuGet packages (GitHub Advisory DB)
+        run: |
+          set -euo pipefail
+          dotnet restore ClickHouseAdoNetProvider.sln
+          # `dotnet list --vulnerable` exits 0 even when it finds something, so
+          # detect findings in its output and fail. --include-transitive because
+          # the whole closure ships into the customer GAC.
+          out=$(dotnet list ClickHouseAdoNetProvider.sln package --vulnerable --include-transitive)
+          echo "$out"
+          if echo "$out" | grep -q 'has the following vulnerable'; then
+            echo "::error::Vulnerable NuGet package(s) found — see the list above (https://github.com/advisories)."
+            exit 1
+          fi
+          echo "No vulnerable packages."
