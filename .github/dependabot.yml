@@ -1,7 +1,7 @@
 version: 2
 updates:
-  # .NET package dependencies (src/, tests/, tools/ all resolve from the
-  # repo-root solution, so directory "/" covers every .csproj).
+  # .NET package dependencies (src/, tests/, tools/ + .config/dotnet-tools.json
+  # all resolve from the repo-root solution, so directory "/" covers them).
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
@@ -10,8 +10,30 @@ updates:
     labels:
       - "dependencies"
       - "nuget"
+    groups:
+      # Test-only tooling never ships in the provider — bundle every bump into
+      # one PR instead of one-per-package (the NUnit family alone was 4 PRs/week).
+      test-tooling:
+        patterns:
+          - "NUnit*" # NUnit.Console, NUnit.ConsoleRunner, NUnit.Analyzers, NUnit3TestAdapter
+          - "nunit" # the core framework package (lowercase id)
+          - "NSubstitute"
+          - "coverlet*"
+          - "Microsoft.NET.Test.Sdk"
+          - "GitHubActionsTestLogger"
+          - "Dapper*"
+      # Microsoft.Extensions.* move in lockstep (all 10.0.x) — one PR, not N.
+      microsoft-extensions:
+        patterns:
+          - "Microsoft.Extensions.*"
+    # Runtime deps that ship in the GAC closure — NodaTime, System.Text.Json,
+    # System.Memory, Microsoft.IO.RecyclableMemoryStream, dotnet-ilrepack,
+    # Microsoft.SourceLink.GitHub, Microsoft.NETFramework.ReferenceAssemblies —
+    # are intentionally left ungrouped: each gets its own PR and review, since a
+    # closure change has shipped-artifact impact (e.g. M.E.Http 10 dropped
+    # System.ValueTuple).
 
-  # Actions used by our own workflows (ci.yml, windows.yml, claude-review.yml).
+  # Actions used by our own workflows.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -20,3 +42,8 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      # Action bumps are low-risk plumbing — one PR for all of them.
+      github-actions:
+        patterns:
+          - "*"
